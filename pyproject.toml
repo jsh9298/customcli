@@ -8,10 +8,11 @@ dependencies = [
     "google-antigravity",
     "google-genai",
     "rich",
-    "prompt_toolkit",
+    "prompt-toolkit",
     "pyperclip",
-    "pyyaml",
+    "PyYAML",
     "python-dotenv",
+    "httpx",
 ]
 
 [project.scripts]

@@ -9,6 +9,7 @@ import pyperclip
 import subprocess
 import re
 import fnmatch
+import inspect
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Union
 from dotenv import load_dotenv
@@ -87,7 +88,7 @@ class ConfigResolver:
             try:
                 with open(p, 'r') as f:
                     data = json.load(f) if p.endswith('.json') else yaml.safe_load(f)
-                    if data: self.deep_merge(base, data)
+                    if isinstance(data, dict): self.deep_merge(base, data)
             except: pass
         return base
     def deep_merge(self, base, override):
@@ -145,8 +146,7 @@ class UnifiedSecureCLI:
         self.active_persona = "default"
         self._immediate_approval = False
         
-        # Don't call re_initialize here as it's redundant now, but keep structure
-        self.personas = self.resolver.discover_personas()
+        self.re_initialize()
         self.register_core_commands()
         self.plugins.load_plugins()
         
@@ -440,7 +440,7 @@ class UnifiedSecureCLI:
         self._cached_cwd = os.getcwd().replace(os.path.expanduser('~'), '~')
         self._cached_sandbox = "sandboxed" if self.config.get('enableTerminalSandbox') else "no sandbox"
         self._versions = {}
-        for lib in ['google-antigravity', 'google-genai', 'rich', 'prompt_toolkit']:
+        for lib in ['google-antigravity', 'google-genai', 'rich', 'prompt-toolkit', 'pyyaml', 'pyperclip', 'python-dotenv']:
             try: self._versions[lib] = metadata.version(lib)
             except: self._versions[lib] = "N/A"
 
@@ -526,7 +526,17 @@ class UnifiedSecureCLI:
                     async for thought in response.thoughts:
                         live.update(self.ui.render_thought_panel(thought))
                 
-                content = await response.text() if hasattr(response, 'text') else response.text
+                # Robust response text extraction
+                if hasattr(response, 'text'):
+                    res_attr = response.text
+                    if asyncio.iscoroutine(res_attr) or asyncio.iscoroutinefunction(res_attr):
+                        content = await res_attr() if asyncio.iscoroutinefunction(res_attr) else await res_attr
+                    elif callable(res_attr):
+                        content = res_attr()
+                    else:
+                        content = res_attr
+                else:
+                    content = str(response)
                 if "[ENTER_PLAN_MODE]" in content: self.current_mode_idx = 2
                 
                 # [Response Firewall] AI 응답 내용도 전송 직후 마스킹 검사 수행

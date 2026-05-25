@@ -27,7 +27,7 @@ class SecurityProtector:
         if os.path.exists(config_path):
             try:
                 with open(config_path, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
+                    config = yaml.safe_load(f) or {}
                     self.patterns = config.get('patterns', {})
                     self.guardrails = config.get('guardrails', [])
                     self.logger.info(f"Loaded {len(self.patterns)} patterns and {len(self.guardrails)} guardrails.")

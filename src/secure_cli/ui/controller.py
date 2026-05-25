@@ -26,8 +26,10 @@ class UIController:
 
     def render_header(self, mode: str, backend: str):
         if self.detail_mode == "minimal": return
+        # Ensure clean line start for layout stability
+        self.console.print() 
         status = f" BACKEND: {backend.upper()} | MODE: {mode.upper()} | ? for help"
-        self.console.print(status, style="on #333333 white", justify="left")
+        self.console.print(Panel(status, style="white on #333333", expand=True, padding=(0, 1)))
 
     def render_dashboard(self, cwd: str, sandbox: str, model: str, usage: str):
         if self.detail_mode == "minimal": return
@@ -40,6 +42,7 @@ class UIController:
             f"[dim]Q:[/dim] {usage}"
         )
         self.console.print(grid)
+        self.console.print("-" * self.console.width, style="dim")
 
     def print_info(self, text: str):
         self.console.print(f"[info]{text}[/info]")

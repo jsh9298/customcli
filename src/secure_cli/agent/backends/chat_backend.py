@@ -36,6 +36,7 @@ class ChatBackend:
             # OpenAI 호환 백엔드 (Ollama, DeepSeek 등)
             self.api_key = os.getenv("EXTERNAL_API_KEY", "no-key")
             self.base_url = self.config_data.get('agent', {}).get('base_url', "http://localhost:11434/v1")
+            # [Fix] Use model from config if available, fallback to llama3
             self.model = self.config_data.get('agent', {}).get('model', "llama3")
             self.history = []
 

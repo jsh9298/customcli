@@ -220,6 +220,7 @@ class UnifiedSecureCLI:
         self.commands.register('/copy', self.cmd_copy)
         self.commands.register('/multiline', self.cmd_multiline)
         self.commands.register('/model', self.cmd_model)
+        self.commands.register('/models', self.cmd_models)
         self.commands.register('/plan', self.cmd_plan)
         self.commands.register('/agents', self.cmd_agents)
         self.commands.register('/autonomy', self.cmd_autonomy)
@@ -248,6 +249,7 @@ class UnifiedSecureCLI:
         self.commands.register('/schedule', self.cmd_schedule)
         self.commands.register('/group', self.cmd_group)
         self.commands.register('/mcp', self.cmd_mcp)
+        self.commands.register('/inline', self.cmd_inline)
 
     # --- Command Handlers ---
     async def cmd_help(self, ctx, *args):
@@ -421,6 +423,30 @@ class UnifiedSecureCLI:
             cmd_args = args[3:] if len(args) > 3 else []
             res = await self.mcp_manager.connect_external_stdio(name, cmd, cmd_args)
             self.ui.print_info(res)
+
+    async def cmd_inline(self, ctx, *args):
+        """Execute a one-shot command without breaking conversation flow (Ctrl+I)."""
+        with patch_stdout():
+            cmd = await self.session.prompt_async("Inline Command: ")
+        if cmd.strip():
+            if cmd.startswith('!'): await self.run_shell(cmd[1:].strip())
+            elif cmd.startswith('/'): await self.commands.handle(cmd, ctx)
+            else: await self.chat_cycle(cmd)
+
+    async def cmd_models(self, ctx, *args):
+        """List available models from the Gemini API (if applicable)."""
+        if self.cli_mode == "chat" and hasattr(self.backend, 'provider') and self.backend.provider == "google":
+            try:
+                models = self.backend.client.models.list()
+                t = Table(title="Available Google Models")
+                t.add_column("Model ID"); t.add_column("Capabilities")
+                for m in models:
+                    t.add_row(m.name, ", ".join(m.supported_generation_methods))
+                self.ui.console.print(t)
+            except Exception as e:
+                self.ui.print_error(f"Failed to fetch models: {e}")
+        else:
+            self.ui.print_info("Dynamic model listing currently only supported for Google Chat backend.")
 
     async def switch_mode(self, new_mode: str):
         if self.backend: await self.backend.close()

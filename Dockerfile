@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir "protobuf>=5.29.1" "grpcio>=1.70.0"
 
 # Copy project configuration
-COPY pyproject.toml README.md USAGE_GUIDE.md GEMINI.md MAINTENANCE.md agent_config.yaml masking_config.yaml agents.md ./
+COPY pyproject.toml README.md GEMINI.md MAINTENANCE.md agent_config.yaml masking_config.yaml agents.md ./
 
 # [Critical Fix] COPY source code BEFORE pip install
 COPY src/ ./src/

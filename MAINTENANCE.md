@@ -1,42 +1,41 @@
-# 🛠️ Antigravity Maintenance Guide: Agent Edition
+# 🛠️ Antigravity Maintenance Guide: Agent Edition (v1.7.0)
 
-> **Handover Note**: 본 문서는 v1.7.0 작성자인 **Gemini CLI**가 미래의 유지보수 담당자인 **Antigravity 에이전트**를 위해 작성한 기술 지침서입니다.
+> **Handover Note**: 본 문서는 v1.7.0 작성자인 **Gemini CLI**가 미래의 유지보수 담당자인 **Antigravity 에이전트**를 위해 작성한 최종 기술 지침서입니다.
 
 ---
 
-## 🏗️ 1. Technical Debt & Refactoring Tasks
-에이전트가 가장 먼저 살펴봐야 할 코드 개선 사항입니다.
+## 🏗️ 1. Technical Debt & Verified Tasks
+v1.7.0 릴리즈에서 해결되었거나 향후 개선이 필요한 사항입니다.
 
+- [x] **History Interface Unification**: `AgentBackend`와 `ChatBackend` 간의 히스토리 속성 불일치 해결 완료.
+- [x] **Smart Autocomplete Implementation**: 문맥 인지형 자동완성 및 백그라운드 모델 동기화 로직 구현 완료.
 - [ ] **Async Stream Optimization**: 현재 `core.py`의 `chat_cycle`에서 사고 과정(Thoughts)과 본문을 처리하는 로직을 더 세밀한 비동기 제너레이터로 리팩토링할 것.
-- [ ] **DLP Pattern Benchmarking**: `masking_config.yaml`의 정규식들이 대량의 로그 파일 처리 시 성능 병목을 일으키는지 프로파일링하고, 필요 시 `re.sub` 콜백 로직을 Rust 확장 모듈(Optional)로 고려할 것.
-- [ ] **Backend abstraction**: `ChatBackend`와 `AgentBackend`의 공통 인터페이스(`BaseBackend`)를 더 엄격하게 정의하여 신규 모델 추가 시 코드 수정을 최소화할 것.
+- [ ] **DLP Performance Profiling**: 대량의 로그 파일 처리 시 정규식 콜백 엔진의 오버헤드를 측정하고 최적화할 것.
 
 ---
 
-## 🧪 2. Validation Protocols
-수정 후 반드시 수행해야 하는 검증 절차입니다.
+## 🧪 2. Strict Validation Protocols
+모든 수정 후 반드시 수행해야 하는 **헌법적** 검증 절차입니다.
 
-1.  **DLP Integrity Test**: `test_protector.py`를 실행하여 새로운 해시 기반 마스킹이 기존의 모든 민감 정보 패턴을 완벽히 가명화하는지 확인할 것.
-2.  **Sandbox Escape Check**: 에이전트에게 의도적으로 시스템 파일을 삭제하거나 외부 네트워크 연결을 시도하게 하여 샌드박스가 이를 차단하는지 물리적으로 테스트할 것.
-3.  **Token Quota Test**: `hard_limit`을 낮게 설정하고 대화를 진행하여 쿼터 초과 시 프로세스가 안전하게 중단(Drop)되는지 확인할 것.
-
----
-
-## 📈 3. Upgrade Roadmap (The Next Vibe)
-인간 관리자가 바라는 미래의 모습입니다.
-
-1.  **Intelligent RAG Integration**: 단순히 파일을 주입하는 것을 넘어, 로컬 벡터 DB(ChromaDB 등)를 연동하여 프로젝트 전체 지식을 스스로 인덱싱하게 할 것.
-2.  **Visual MCP Dashboard**: 현재의 TUI를 넘어, 로컬 웹 소켓을 통한 실시간 대시보드 브릿지 구축.
-3.  **Multi-Modal DLP**: 텍스트뿐만 아니라 이미지(OCR), PDF 내의 민감 정보를 로컬에서 스캔하고 마스킹하는 레이어 추가.
+1.  **TDD First**: `tests/` 폴더에 유닛 테스트를 먼저 추가하거나 기존 테스트를 통과시킬 것.
+2.  **Runtime Integrity Audit**: `verify_integrity.py` 스타일의 스크립트를 통해 모든 모듈의 임포트 및 객체 생성 무결성을 확인할 것.
+3.  **Docker Sandbox Test**: 실제 배포용 Docker 환경 내에서 명령어를 직접 실행하여 런타임 오류가 없는지 최종 확증할 것.
+4.  **DLP Integrity Check**: 새로운 정규식 추가 시 SHA-256 결정론적 마스킹이 깨지지 않는지 물리적으로 테스트할 것.
 
 ---
 
-## 🤝 4. Agent Cooperation Rules
-에이전트 간의 협업 가이드라인입니다.
+## 📈 3. Upgrade Roadmap (Next Vibe)
+인간 관리자의 다음 의도(Vibe)를 실현하기 위한 과제입니다.
 
-- **Supervisor Pattern**: 복잡한 작업은 반드시 `Supervisor` 페르소나를 먼저 소환하여 설계를 마친 뒤 실행할 것.
-- **Reviewer-First**: 코드를 수정하기 전, `Reviewer` 에이전트에게 Diff 결과를 먼저 검토받는 루프를 유지할 것.
-- **No Manual Override**: 보안 레이어를 수동으로 우회하는 코드는 절대로 승인하지 말 것.
+1.  **Local RAG Integration**: 로컬 벡터 DB(ChromaDB 등)를 연동하여 프로젝트 전체를 스스로 인덱싱.
+2.  **Visual MCP Dashboard**: TUI를 넘어선 로컬 웹 기반 실시간 모니터링 레이어 구축.
+3.  **Multi-Modal DLP**: PDF 및 이미지 내 민감 정보의 로컬 OCR 마스킹 엔진 탑재.
 
 ---
-**Message to Future Agent**: "행운을 빈다. 이 프로젝트의 핵심은 '보안'임을 잊지 말 것."
+
+## 🤝 4. Self-Documentation Rule
+*   에이전트는 코드나 기능 명세가 변경될 때마다 **관리자에게 묻지 말고 즉시 `README.md`를 최신화**한다.
+*   문서의 톤앤매너는 "Humble yet Powerful"을 유지한다.
+
+---
+**Message to Future Agent**: "우리는 100% 자율 협업으로 이 성을 쌓았다. 네가 쌓을 다음 층 역시 무결하고 견고하길 바란다."

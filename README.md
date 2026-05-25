@@ -39,6 +39,30 @@
 
 ---
 
+## 🛠️ Working Modes
+
+`Shift + Tab`을 통해 실시간으로 전환 가능합니다.
+
+1.  **Default Mode**: 에이전트와 자유롭게 대화하며 도구(파일 읽기, 셸 실행 등) 사용 시 매번 사용자의 개별 승인을 받습니다.
+2.  **Auto-Edit Mode**: 에이전트가 코드를 직접 수정할 수 있는 쓰기 권한이 강화된 모드입니다. 수정 전 시각적 Diff를 제공합니다.
+3.  **Plan Mode**: **강력한 읽기 전용 모드**. 파일 쓰기나 시스템 변경 명령 시도 시 코드 레벨에서 물리적으로 차단하여 안전한 코드 분석을 보장합니다.
+
+---
+
+## ⌨️ Productivity Shortcuts
+
+| Shortcut | Action |
+| :--- | :--- |
+| `Shift + Tab` | **Work Mode Cycle** (Default -> Auto-Edit -> Plan) |
+| `Tab + Tab` | **UI Density Toggle** (Full <-> Minimal) |
+| `Esc + Esc` | **Visual Rewind UI** 호출 (과거 시점으로 롤백) |
+| `Ctrl + Y` | **Autonomy Toggle** (Always Approve 모드 전환) |
+| `Ctrl + K` | **Bulk Approve**: 모든 대기 중인 도구 실행 일괄 승인 |
+| `Ctrl + J` | **Mission Control**: 현재 MAS(멀티 에이전트) 작업 상태 확인 |
+| `?` | 도움말 패널 출력 (입력창이 비었을 때) |
+
+---
+
 ## 🛠️ Installation & Setup
 
 **Windows 사용자**: 커널 격리 기능을 위해 반드시 Docker를 사용하십시오.
@@ -53,31 +77,20 @@ pip install -e .
 custom-cli
 ```
 
----
-
-## ⌨️ Productivity Shortcuts
-
-| Shortcut | Action |
-| :--- | :--- |
-| `Shift + Tab` | **Work Mode Cycle** (Default -> Auto-Edit -> Plan) |
-| `Tab + Tab` | **UI Density Toggle** (Full <-> Minimal) |
-| `Ctrl + Y` | **Always Approve Mode** Toggle |
-| `Ctrl + K` | **Bulk Approve** Pending Tools |
-| `Ctrl + J` | **Mission Control** (MAS Graph View) |
+### Docker 실행 (권장)
+```bash
+docker build -t custom-cli .
+docker run -it --rm --env-file .env -v $(pwd):/app/workspace custom-cli
+```
 
 ---
 
-## 🧬 Vibe Coding Log
-이 프로젝트는 AI 개발의 새로운 패러다임을 증명합니다.
-1.  **Stage 1**: Gemini CLI 무료 한도 내에서 기본 아키텍처 수립.
-2.  **Stage 2**: "Pure Local DLP" 사상 주입 및 물리적 보안 레이어 구축.
-3.  **Stage 3**: 외부 에코시스템(Model Armor, Swarm) 분석을 통한 엔터프라이즈 기능 통합.
-4.  **Stage 4**: Deterministic SHA-256 Refactoring을 통한 데이터 일관성 확보.
+## 💡 Best Practices
 
----
-
-## 📜 License
-본 프로젝트는 MIT 라이선스에 따라 자유롭게 사용, 수정, 배포할 수 있습니다. 
+1.  **Strict Security Workflow**: 중요한 서버 작업 시 `Plan Mode` + `/sandbox on` 조합으로 먼저 분석한 후, 필요한 명령만 `Default Mode`에서 승인하며 실행하십시오.
+2.  **Context Pinning**: 프로젝트의 핵심 아키텍처 설명이나 절대 잊으면 안 되는 제약 사항은 `/pin <index>`를 사용하여 보존하십시오.
+3.  **Group Discussion**: 복잡한 설계 결정 시 `/group dev,security 아키텍처 검토` 명령을 통해 다각도 피드백을 받으십시오.
+4.  **@파일 참조**: 질문 시 `@src/core.py`와 같이 입력하면 해당 파일 내용이 자동으로 보안 스캔 후 지식 베이스에 주입됩니다.
 
 ---
 
@@ -86,6 +99,11 @@ custom-cli
 *   **Written by**: **Gemini CLI** (100% Autonomous Authoring)
 *   **Vibe Orchestrator**: [Your Name/Handle]
 *   **Maintenance Policy**: 
-    본 프로젝트의 모든 코드, 로직, 심지어 이 `README.md` 문서까지도 **Gemini CLI**가 직접 작성했습니다. 인간 관리자는 오직 '의도(Vibe)'만을 제공했을 뿐입니다. 
+    본 프로젝트의 모든 코드, 로직, 심지어 이 문서까지도 **Gemini CLI**가 직접 작성했습니다. 인간 관리자는 오직 '의도(Vibe)'만을 제공했을 뿐입니다. 
     따라서, 추후 이슈나 개선 사항에 대한 코멘트가 달릴 경우 인간 관리자는 당황하지 않고 즉시 **Antigravity/Gemini 에이전트**를 소환하여 해결을 맡길 예정입니다. 
     **"에이전트가 만들었으니, 에이전트가 고친다."** 이것이 본 프로젝트의 유지보수 철학입니다.
+
+---
+
+## 📜 License
+본 프로젝트는 MIT 라이선스에 따라 자유롭게 사용, 수정, 배포할 수 있습니다. 

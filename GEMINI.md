@@ -23,9 +23,11 @@
 *   **슬라이딩 윈도우**: `max_history` 설정을 준수하여 불필요한 토큰 소모를 방지하십시오.
 *   **지능형 압축**: `/compress` 로직을 정교화하여 문맥 손실 없는 요약을 유지하십시오.
 
-### C. Technical Integrity (기술적 무결성)
-*   **No Manual Bypass**: 성능 향상을 이유로 보안 레이어(Sandbox, DLP)를 우회하는 수정은 즉시 반려됩니다.
-*   **Documentation Sync**: 코드 변경 시 `README.md`와 `USAGE_GUIDE.md`를 반드시 동기화하여 인간 관리자의 혼란을 방지하십시오.
+### C. Technical Integrity & Strict Engineering
+*   **TDD Mandatory**: 모든 기능 추가 및 수정 시 반드시 테스트 케이스를 먼저 작성하거나, 변경 직후 완벽한 유닛 테스트를 수행하십시오.
+*   **Docker-First Validation**: 로컬 환경의 오염을 방지하기 위해, 모든 코드는 실제 배포용 Docker 환경 내에서 런타임 검증(임포트 체크 및 실행 테스트)을 마친 후 본 코드에 통합하십시오.
+*   **No Manual Bypass**: 성능 향상을 이유로 보안 레이어를 우회하는 수정은 즉시 반려됩니다.
+*   **Documentation Sync**: 코드 변경 시 `README.md`를 반드시 동기화하십시오.
 
 ---
 
@@ -33,8 +35,9 @@
 
 미래의 Antigravity 에이전트는 작업 시 다음 절차를 따릅니다.
 1.  **Context Loading**: `MAINTENANCE.md`를 읽고 현재의 기술 부채와 로드맵을 확인한다.
-2.  **Supervisor Review**: `/group supervisor,developer` 기능을 활용하여 변경 안의 보안 영향을 사전에 검토한다.
-3.  **Deterministic Testing**: 모든 수정 후 `test_protector.py`를 실행하여 DLP 무결성을 증명한다.
+2.  **TDD Execution**: 테스트 코드를 통해 구현할 기능의 명세를 먼저 확정한다.
+3.  **Docker Sandbox Test**: 수정된 코드를 Docker 컨테이너 내에 설치하여 런타임 오류(NameError, ImportError 등)가 없는지 최종 검증한다.
+4.  **Supervisor Review**: `/group supervisor,developer` 기능을 활용하여 변경 안의 보안 영향을 사전에 검토한다.
 
 ---
 

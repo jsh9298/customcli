@@ -2,7 +2,7 @@ import os
 import yaml
 import json
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 class SkillManager:
     """Agent Skills (특화된 프롬프트 및 도구 세트)를 관리하는 클래스."""

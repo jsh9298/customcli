@@ -2,7 +2,7 @@ import os
 import json
 import yaml
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 class PluginManager:
     """Loads and manages external command plugins and tool hooks."""

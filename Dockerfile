@@ -28,4 +28,4 @@ RUN pip install --no-cache-dir .
 VOLUME ["/app/workspace", "/app/sessions", "/app/debug_payload.log"]
 
 # Set entry point to the installed script
-ENTRYPOINT ["secure-cli"]
+ENTRYPOINT ["custom-cli"]

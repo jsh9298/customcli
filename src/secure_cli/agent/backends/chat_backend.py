@@ -22,7 +22,8 @@ class ChatBackend:
     async def initialize(self):
         if self.provider == 'google':
             api_key = os.getenv("GEMINI_API_KEY")
-            self.client = genai.Client(api_key=api_key, http_options={'api_version': 'v1alpha'})
+            # [Fix] Use stable v1 version for better model compatibility
+            self.client = genai.Client(api_key=api_key)
             
             agent_params = self.config_data.get('agent', {})
             model_name = agent_params.get('model', 'gemini-1.5-flash')

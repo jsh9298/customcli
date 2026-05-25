@@ -6,9 +6,15 @@
 agent:
   # provider: "google" # 또는 "openai-compatible" (Ollama, DeepSeek 등)
   # base_url: "http://localhost:11434/v1" # OpenAI 호환 API 주소
-  model: "gemini-1.5-flash"
+  
+  # [Model IDs - 2026 Standard]
+  # - gemini-3.5-flash (Balanced)
+  # - gemini-3.5-pro (High intelligence)
+  # - gemini-flash-latest / gemini-pro-latest (Always up-to-date)
+  # - antigravity-preview-05-2026 (For Agent Mode optimization)
+  model: "gemini-3.5-flash"
   temperature: 0.7
-  max_output_tokens: 4096
+  max_output_tokens: 8192
 
 # [State & Lifecycle Management]
 state:

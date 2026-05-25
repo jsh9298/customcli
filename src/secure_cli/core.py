@@ -291,7 +291,12 @@ class UnifiedSecureCLI:
         latest = self.session_manager.get_latest_session()
         if latest: await self.cmd_load(ctx, latest)
     async def cmd_rewind(self, ctx, *args): await self.launch_rewind_ui()
-    async def cmd_copy(self, ctx, *args): pyperclip.copy(self.last_response); self.ui.print_info("Copied last response to clipboard.")
+    async def cmd_copy(self, ctx, *args):
+        try:
+            pyperclip.copy(self.last_response)
+            self.ui.print_info("Copied last response to clipboard.")
+        except Exception as e:
+            self.ui.print_warning(f"Clipboard copy failed (Expected in Docker/Headless): {e}")
     async def cmd_multiline(self, ctx, *args): self.multiline = not self.multiline; self.ui.print_info(f"Multiline Mode: {'ON' if self.multiline else 'OFF'}")
     async def cmd_model(self, ctx, *args):
         if args: self.config['agent']['model'] = args[0]; ctx['should_reinit'] = True

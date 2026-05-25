@@ -1,7 +1,7 @@
 import logging
 from google.antigravity import Agent, LocalAgentConfig, CapabilitiesConfig
 from google.antigravity.hooks import policy
-from typing import Any, List, Optional, Callable
+from typing import Any, List, Optional, Callable, Dict
 
 # [Bridge] Global reference to avoid deepcopy issues with bound methods
 _ask_user_handler_bridge: Optional[Callable] = None
@@ -20,6 +20,8 @@ class AgentBackend:
         self.ask_user_handler = ask_user_handler
         self.agent = None
         self.context_manager = None
+        # [Fix] History interface for command compatibility
+        self.history: List[Dict[str, Any]] = []
 
     async def initialize(self):
         # Set the global bridge for this session

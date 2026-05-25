@@ -52,28 +52,73 @@ from secure_cli.agent.backends.chat_backend import ChatBackend
 logging.basicConfig(filename='unified_secure_cli.log', level=logging.DEBUG)
 
 class SmartCompleter(Completer):
-    def __init__(self, command_registry, plugin_manager):
-        self.registry = command_registry
-        self.plugins = plugin_manager
+    def __init__(self, cli):
+        self.cli = cli
+
     def get_completions(self, document, complete_event):
         text = document.text_before_cursor
+        
+        # 1. Slash Command & Argument Completion
         if text.startswith('/'):
-            cmds = self.registry.get_commands() + self.plugins.get_plugin_commands()
-            for cmd in sorted(set(cmds)):
-                if cmd.startswith(text):
-                    yield Completion(cmd, start_position=-len(text))
+            parts = text.split()
+            if len(parts) <= 1 and not text.endswith(' '):
+                # Completing the command itself
+                cmds = self.cli.commands.get_commands() + self.cli.plugins.get_plugin_commands()
+                for cmd in sorted(set(cmds)):
+                    if cmd.lower().startswith(text.lower()):
+                        yield Completion(cmd, start_position=-len(text))
+                return
+
+            # Context-Aware Argument Completion
+            cmd = parts[0].lower()
+            arg_prefix = parts[-1] if not text.endswith(' ') else ""
+            
+            suggestions = []
+            if cmd == '/model':
+                suggestions = self.cli.available_models
+            elif cmd == '/agents':
+                suggestions = list(self.cli.personas.keys())
+            elif cmd in ['/load', '/sessions']:
+                suggestions = self.cli.session_manager.list_sessions()
+            elif cmd == '/skills':
+                if len(parts) == 2 and not text.endswith(' '):
+                    suggestions = ["list", "load", "save"]
+                else:
+                    suggestions = self.cli.skill_manager.list_skills()
+            elif cmd == '/mode':
+                suggestions = ["agent", "chat"]
+            elif cmd == '/autonomy':
+                suggestions = ["always", "review"]
+            elif cmd == '/file':
+                for c in self._get_file_completions(arg_prefix):
+                    yield c
+                return
+            
+            for s in suggestions:
+                if s.lower().startswith(arg_prefix.lower()):
+                    yield Completion(s, start_position=-len(arg_prefix))
+
+        # 2. File Reference Completion (@path)
         elif '@' in text:
             match = re.search(r'@([^\s]*)$', text)
             if match:
                 path_prefix = match.group(1)
-                dirname = os.path.dirname(path_prefix) or "."
-                basename = os.path.basename(path_prefix)
-                try:
-                    if os.path.isdir(dirname):
-                        for f in os.listdir(dirname):
-                            if f.startswith(basename):
-                                yield Completion(f, start_position=-len(basename))
-                except: pass
+                for c in self._get_file_completions(path_prefix):
+                    yield c
+
+    def _get_file_completions(self, path_prefix):
+        dirname = os.path.dirname(path_prefix) or "."
+        basename = os.path.basename(path_prefix)
+        try:
+            if os.path.isdir(dirname):
+                for f in os.listdir(dirname):
+                    if f.startswith(basename):
+                        full_f = os.path.join(dirname, f)
+                        if os.path.isdir(full_f):
+                            yield Completion(f + "/", start_position=-len(basename))
+                        else:
+                            yield Completion(f, start_position=-len(basename))
+        except: pass
 
 class ConfigResolver:
     GLOBAL_ROOT = os.path.expanduser('~/.gemini/antigravity-cli')
@@ -145,6 +190,7 @@ class UnifiedSecureCLI:
         self.debug_log_enabled = False
         self.active_persona = "default"
         self._immediate_approval = False
+        self.available_models: List[str] = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]
         
         self.re_initialize()
         self.register_core_commands()
@@ -198,7 +244,7 @@ class UnifiedSecureCLI:
 
         self.session = PromptSession(
             history=FileHistory(os.path.expanduser('~/.unified_secure_history')),
-            completer=SmartCompleter(self.commands, self.plugins),
+            completer=SmartCompleter(self),
             key_bindings=self.kb
         )
 
@@ -445,7 +491,10 @@ class UnifiedSecureCLI:
                 models = self.backend.client.models.list()
                 t = Table(title="Available Google Models")
                 t.add_column("Model ID"); t.add_column("Capabilities")
+                # Populate dynamic models for autocompletion
+                self.available_models = []
                 for m in models:
+                    self.available_models.append(m.name)
                     t.add_row(m.name, ", ".join(m.supported_generation_methods))
                 self.ui.console.print(t)
             except Exception as e:
@@ -463,6 +512,19 @@ class UnifiedSecureCLI:
             self.backend = ChatBackend(self.config, self.prompt)
         await self.backend.initialize()
         self.ui.print_info(f"Switched to {self.cli_mode.upper()} backend.")
+        
+        # [Smart Autocomplete] Background fetch available models
+        if self.cli_mode == "chat" and hasattr(self.backend, 'provider') and self.backend.provider == "google":
+            asyncio.create_task(self._fetch_models_silent())
+
+    async def _fetch_models_silent(self):
+        """Silently update available_models for autocompletion."""
+        try:
+            # We use a synchronous generator from the SDK, so we run it in a thread or just call it
+            # if it's not blocking for too long.
+            models = self.backend.client.models.list()
+            self.available_models = [m.name for m in models]
+        except: pass
 
     def re_initialize(self):
         self.config = self.resolver.resolve_settings()
@@ -579,6 +641,10 @@ class UnifiedSecureCLI:
                 
             self.last_response = self.protector.unmask(full_text)
             
+            # Update unified history interface
+            self.backend.history.append({"role": "user", "content": user_input})
+            self.backend.history.append({"role": "assistant", "content": self.last_response})
+
             # Auto-compression when history is long and efficient_mode is ON
             max_h = self.config.get('state', {}).get('max_history', 15)
             if self.efficient_mode and len(self.backend.history) > max_h:

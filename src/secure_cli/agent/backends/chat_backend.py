@@ -3,6 +3,7 @@ from google.genai import types
 import os
 import httpx
 import json
+from typing import List, Dict, Any
 
 class ChatBackend:
     """
@@ -15,6 +16,8 @@ class ChatBackend:
         self.client = None
         self.chat_session = None
         self.provider = config_data.get('agent', {}).get('provider', 'google')
+        # [Fix] Initialize history in constructor to prevent AttributeError
+        self.history: List[Dict[str, Any]] = []
 
     async def initialize(self):
         if self.provider == 'google':
@@ -60,8 +63,7 @@ class ChatBackend:
                 )
                 data = resp.json()
                 content = data['choices'][0]['message']['content']
-                self.history.append({"role": "user", "content": text})
-                self.history.append({"role": "assistant", "content": content})
+                # [Note] core.py will also append to this history
                 
                 # Mock response object to maintain compatibility with core.py
                 class MockResponse:

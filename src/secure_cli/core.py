@@ -426,7 +426,8 @@ class UnifiedSecureCLI:
         if self.backend: await self.backend.close()
         self.cli_mode = new_mode
         if self.cli_mode == "agent":
-            self.backend = AgentBackend(self.config, self.prompt)
+            # Pass terminal approval handler to Antigravity SDK policy
+            self.backend = AgentBackend(self.config, self.prompt, ask_user_handler=self.run_shell)
         else:
             self.backend = ChatBackend(self.config, self.prompt)
         await self.backend.initialize()

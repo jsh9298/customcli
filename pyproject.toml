@@ -1,0 +1,22 @@
+[project]
+name = "custom-cli"
+version = "1.7.0"
+description = "Humble Custom AI Workstation with Antigravity and GenAI support"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "google-antigravity",
+    "google-genai",
+    "rich",
+    "prompt_toolkit",
+    "pyperclip",
+    "pyyaml",
+    "python-dotenv",
+]
+
+[project.scripts]
+custom-cli = "secure_cli.core:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

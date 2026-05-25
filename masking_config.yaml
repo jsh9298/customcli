@@ -1,0 +1,6 @@
+# Security Masking Patterns Configuration
+patterns:
+  EMAIL: '[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+'
+  API_KEY: 'AIzaSy[A-Za-z0-9_-]{33}'
+  IPV4: '\b(?:\d{1,3}\.){3}\d{1,3}\b'
+  AWS_KEY: 'AKIA[0-9A-Z]{16}'

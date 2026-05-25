@@ -1,0 +1,45 @@
+# ==============================================================================
+# 🤖 Unified Agent Workstation: Configuration Profile
+# ==============================================================================
+
+# [Agent Settings]
+agent:
+  # provider: "google" # 또는 "openai-compatible" (Ollama, DeepSeek 등)
+  # base_url: "http://localhost:11434/v1" # OpenAI 호환 API 주소
+  model: "gemini-1.5-flash"
+  temperature: 0.7
+  max_output_tokens: 4096
+
+# [State & Lifecycle Management]
+state:
+  expiry_days: 7
+  max_history: 15
+  # hard_limit: 1000000 # 세션당 최대 허용 토큰 (Quota Enforcement)
+
+# [Capabilities & Permissions]
+capabilities:
+  filesystem:
+    read: true
+    write: true
+  terminal:
+    execute: true
+  browser:
+    enabled: false
+
+# [Security Policies]
+# 특정 도구의 실행 권한을 세밀하게 제어합니다.
+policies:
+  - tools: ["rm", "sudo", "curl", "wget"]
+    action: "ask_user"
+  - tools: ["ls", "cat", "grep", "git"]
+    action: "allow"
+
+# [Exclusion Rules]
+# 에이전트가 접근하거나 수정해서는 안 되는 경로 패턴입니다.
+exclude_paths:
+  - ".env"
+  - ".git"
+  - ".sessions"
+  - "*.log"
+  - "node_modules"
+  - "__pycache__"

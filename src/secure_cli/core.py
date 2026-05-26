@@ -361,9 +361,17 @@ class UnifiedSecureCLI:
             history=FileHistory(os.path.expanduser('~/.unified_secure_history')),
             completer=SmartCompleter(self),
             key_bindings=self.kb,
-            style=self.tui_style
+            style=self.tui_style,
+            complete_while_typing=True
         )
         self.inline_session = PromptSession(style=self.tui_style)
+
+        # Disable Tab key from cycling through completions
+        @self.kb.add('tab')
+        def _(e):
+            # Do nothing or insert a real tab if preferred. 
+            # Here we just prevent it from interfering with completion selection.
+            e.app.current_buffer.insert_text('    ') 
 
     def register_core_commands(self):
         self.commands.register('/help', self.cmd_help, "도움말 출력")

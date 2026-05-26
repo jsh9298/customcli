@@ -46,6 +46,7 @@ from secure_cli.utils.compressor import ContextCompressor
 from secure_cli.utils.skills import SkillManager
 from secure_cli.utils.git import GitUtility
 from secure_cli.utils.scheduler import TaskScheduler
+from secure_cli.utils.logger import PayloadLogger
 
 # Backends
 from secure_cli.agent.backends.agent_backend import AgentBackend
@@ -61,118 +62,12 @@ class SmartCompleter(Completer):
     def get_completions(self, document, complete_event):
         text = document.text_before_cursor
         
-        # 1. Slash Command & Argument Completion
+        # [Disabled] Slash Command & Argument Completion as requested (avoids loop errors)
         if text.startswith('/'):
-            parts = text.split()
-            if len(parts) <= 1 and not text.endswith(' '):
-                # Completing the command itself
-                cmds = self.cli.commands.get_commands()
-                plugin_cmds = self.cli.plugins.get_plugin_commands()
-                all_cmds = sorted(set(cmds + plugin_cmds))
-                
-                # Calculate padding for alignment (similar to screenshot 2)
-                max_len = max([len(c) for c in all_cmds]) + 4 if all_cmds else 20
-                
-                for cmd in all_cmds:
-                    if cmd.lower().startswith(text.lower()):
-                        desc = self.cli.commands.get_description(cmd) if cmd in cmds else "플러그인 명령어"
-                        # Use display for aligned columns in the menu
-                        yield Completion(
-                            cmd, 
-                            display=f"{cmd:<{max_len}}", 
-                            display_meta=desc, 
-                            start_position=-len(text)
-                        )
-                return
-
-            # Context-Aware Argument Completion
-            cmd = parts[0].lower()
-            arg_prefix = parts[-1] if not text.endswith(' ') else ""
-            
-            suggestions = []
-            if cmd == '/config':
-                if len(parts) == 2 and not text.endswith(' '):
-                    suggestions = [
-                        ("show", "현재 설정 보기"),
-                        ("model", "AI 모델 변경"),
-                        ("agent", "페르소나 변경"),
-                        ("mode", "실행 모드 변경"),
-                        ("autonomy", "자율성 레벨 설정"),
-                        ("efficient", "압축 모드 토글"),
-                        ("sandbox", "샌드박스 토글"),
-                        ("refresh", "설정 새로고침")
-                    ]
-                elif len(parts) >= 2:
-                    sub = parts[1].lower()
-                    if sub == "model": suggestions = [(m, "모델 선택") for m in self.cli.available_models]
-                    elif sub == "agent": suggestions = [(p, "페르소나 선택") for p in self.cli.personas.keys()]
-                    elif sub == "mode": suggestions = [("agent", "에이전트 모드"), ("chat", "대화 모드")]
-                    elif sub == "autonomy": suggestions = [("always", "항상 승인"), ("review", "매번 검토")]
-                
-            elif cmd == '/session':
-                if len(parts) == 2 and not text.endswith(' '):
-                    suggestions = [
-                        ("save", "현재 세션 저장"),
-                        ("load", "세션 불러오기"),
-                        ("list", "저장된 세션 목록"),
-                        ("resume", "최근 세션 재개"),
-                        ("fork", "세션 복제")
-                    ]
-                elif len(parts) >= 2 and parts[1].lower() in ["load", "save"]:
-                    suggestions = [(s, "세션 파일") for s in self.cli.session_manager.list_sessions()]
-
-            elif cmd == '/history':
-                if len(parts) == 2 and not text.endswith(' '):
-                    suggestions = [
-                        ("show", "대화 기록 출력"),
-                        ("undo", "마지막 대화 취소"),
-                        ("rewind", "특정 시점으로 롤백"),
-                        ("compress", "대화 기록 압축"),
-                        ("pin", "메시지 고정"),
-                        ("unpin", "메시지 고정 해제")
-                    ]
-
-            elif cmd == '/usage':
-                suggestions = [("session", "현재 세션 사용량"), ("total", "누적 사용량")]
-
-            elif cmd == '/utility':
-                suggestions = [
-                    ("file", "파일 읽기/주입"),
-                    ("export", "응답 내보내기"),
-                    ("peek", "최근 셸 출력 보기"),
-                    ("preview", "아티팩트 미리보기"),
-                    ("copy", "응답 복사"),
-                    ("clear", "화면 지우기")
-                ]
-            
-            elif cmd == '/protect':
-                suggestions = [("add", "보안 패턴 추가"), ("remove", "보안 패턴 제거")]
-            
-            elif cmd == '/goal':
-                suggestions = [("set", "목표 설정"), ("status", "진행 상황 확인")]
-
-            elif cmd == '/skills':
-                if len(parts) == 2 and not text.endswith(' '):
-                    suggestions = [("list", "스킬 목록"), ("load", "스킬 로드"), ("save", "현재 프롬프트를 스킬로 저장")]
-                else:
-                    suggestions = [(s, "스킬 이름") for s in self.cli.skill_manager.list_skills()]
-            
-            if suggestions:
-                valid_suggestions = [s for s in suggestions if (s[0] if isinstance(s, tuple) else s).lower().startswith(arg_prefix.lower())]
-                max_arg_len = max([len(s[0] if isinstance(s, tuple) else s) for s in valid_suggestions]) + 4 if valid_suggestions else 20
-                
-                for s in suggestions:
-                    label, meta = s if isinstance(s, tuple) else (s, "")
-                    if label.lower().startswith(arg_prefix.lower()):
-                        yield Completion(
-                            label, 
-                            display=f"{label:<{max_arg_len}}", 
-                            display_meta=meta, 
-                            start_position=-len(arg_prefix)
-                        )
+            return
 
         # 2. File Reference Completion (@path)
-        elif '@' in text:
+        if '@' in text:
             match = re.search(r'@([^\s]*)$', text)
             if match:
                 path_prefix = match.group(1)
@@ -248,6 +143,7 @@ class UnifiedSecureCLI:
         self.session_manager = SessionManager(expiry_days=state_cfg.get('expiry_days', 7))
         self.mcp_manager = MCPManager(self.protector)
         self.ui = UIController()
+        self.payload_logger = PayloadLogger()
         
         # [Usage Clarity] Initialize Telemetry with model-specific limits
         agent_cfg = self.config.get('agent', {})
@@ -303,8 +199,6 @@ class UnifiedSecureCLI:
                 self._current_task.cancel()
                 self.ui.print_warning("\n[Abort] 사용자 요청에 의해 작업이 중단되었습니다 (ESC).")
             else:
-                # [Rewind Shortcut] ESC-ESC pattern or just ESC when idle
-                # To maintain old ESC-ESC behavior, we could check timing, but let's keep it simple.
                 pass
 
         @self.kb.add('escape', 'escape')
@@ -324,16 +218,13 @@ class UnifiedSecureCLI:
 
         @self.kb.add('?')
         def _(e):
-            # Only trigger help if the buffer is empty to avoid interfering with normal typing
             if not e.app.current_buffer.text:
                 asyncio.create_task(self.cmd_help({}, None))
             else:
-                # If buffer is not empty, insert the '?' character normally
                 e.app.current_buffer.insert_text('?')
 
         @self.kb.add('c-k')
         def _(e):
-            # Immediate approval logic (simulation for now, but can be used to set a flag)
             self.ui.print_info("Ctrl+K: Immediate Approval triggered (Flag set).")
             self._immediate_approval = True
 
@@ -346,10 +237,10 @@ class UnifiedSecureCLI:
         def _(e):
             asyncio.create_task(self.cmd_inline({}, None))
 
-        # Custom TUI Style (matching screenshot 2)
+        # Custom TUI Style
         self.tui_style = Style.from_dict({
             'completion-menu.completion': 'bg:#333333 #ffffff',
-            'completion-menu.completion.current': 'bg:#445544 #ffffff', # Greenish dark highlight
+            'completion-menu.completion.current': 'bg:#445544 #ffffff',
             'completion-menu.meta.completion': 'bg:#333333 #888888',
             'completion-menu.meta.completion.current': 'bg:#445544 #aaaaaa',
             'scrollbar.background': 'bg:#222222',
@@ -517,7 +408,6 @@ class UnifiedSecureCLI:
         if not args: return
         content = await self.read_file(args[0])
         if not content.startswith("Blocked:"):
-            # [Strict DLP] 주입되는 파일 내용도 반드시 마스킹을 거쳐야 함
             masked_content = self.protector.mask(content)
             self.prompt += f"\n\n--- Reference File: {args[0]} ---\n{masked_content}"
             self.ui.print_info(f"File '{args[0]}' (Masked) injected into current knowledge base.")
@@ -621,9 +511,12 @@ class UnifiedSecureCLI:
 
     async def cmd_inline(self, ctx, *args):
         """Execute a one-shot command without breaking conversation flow (Ctrl+I)."""
-        # [Critical Fix] Use synchronous prompt within run_in_terminal
-        # and apply the same TUI style for consistency.
-        cmd = await run_in_terminal(lambda: prompt("Inline Command: ", style=self.tui_style))
+        # [Critical Fix] Use standard input() in run_in_terminal to avoid asyncio loop conflict
+        def _get_input():
+            print("\n" + "="*20)
+            return input("Inline Command: ")
+            
+        cmd = await run_in_terminal(_get_input)
         
         if cmd and cmd.strip():
             cmd = cmd.strip()
@@ -638,7 +531,6 @@ class UnifiedSecureCLI:
                 models = self.backend.client.models.list()
                 t = Table(title="Available Google Models")
                 t.add_column("Model ID"); t.add_column("Capabilities")
-                # Populate dynamic models for autocompletion
                 self.available_models = []
                 for m in models:
                     self.available_models.append(m.name)
@@ -653,22 +545,17 @@ class UnifiedSecureCLI:
         if self.backend: await self.backend.close()
         self.cli_mode = new_mode
         if self.cli_mode == "agent":
-            # Pass terminal approval handler to Antigravity SDK policy
             self.backend = AgentBackend(self.config, self.prompt, ask_user_handler=self.run_shell)
         else:
             self.backend = ChatBackend(self.config, self.prompt)
         await self.backend.initialize()
         self.ui.print_info(f"Switched to {self.cli_mode.upper()} backend.")
         
-        # [Smart Autocomplete] Background fetch available models
         if self.cli_mode == "chat" and hasattr(self.backend, 'provider') and self.backend.provider == "google":
             asyncio.create_task(self._fetch_models_silent())
 
     async def _fetch_models_silent(self):
-        """Silently update available_models for autocompletion."""
         try:
-            # We use a synchronous generator from the SDK, so we run it in a thread or just call it
-            # if it's not blocking for too long.
             models = self.backend.client.models.list()
             self.available_models = [m.name for m in models]
         except: pass
@@ -755,11 +642,11 @@ class UnifiedSecureCLI:
             self.ui.print_info(f"Conversation history rewound to step {idx}.")
 
     async def chat_cycle(self, user_input):
-        # [Feature] Automatic @file reference parsing
-        # find @path/to/file in input and inject content
-        file_refs = re.findall(r'@([^\s]+)', user_input)
+        # [Feature] Automatic @file reference parsing (improved regex for spaces)
+        file_refs = re.findall(r'@("([^"]+)"|([^\s]+))', user_input)
         injected_content = ""
-        for path in file_refs:
+        for full_match, quoted, unquoted in file_refs:
+            path = quoted if quoted else unquoted
             content = await self.read_file(path)
             if not content.startswith("Error") and not content.startswith("Blocked"):
                 masked_file_content = self.protector.mask(content)
@@ -768,16 +655,25 @@ class UnifiedSecureCLI:
         full_input = user_input + injected_content
         masked_input = self.protector.mask(full_input)
         
+        # [Security Audit] Log outgoing payload
+        self.payload_logger.log_payload(self.cli_mode, masked_input)
+        
         try:
             self.ui.console.print(f"\n[{self.cli_mode}]🤖 {self.cli_mode.upper()}:[/{self.cli_mode}]")
             full_text = ""
             with self.ui.create_live_display() as live:
-                response, usage = await self.backend.chat(masked_input)
+                # [Retry Logic] Ensure backend is stable
+                try:
+                    response, usage = await self.backend.chat(masked_input)
+                except Exception as e:
+                    self.ui.print_warning(f"Connection lost, retrying... ({e})")
+                    await self.backend.initialize()
+                    response, usage = await self.backend.chat(masked_input)
+                
                 self.telemetry.update_usage(usage)
                 
                 if hasattr(response, 'thoughts'):
                     async for thought in response.thoughts:
-                        # Check for cancellation within async iterations
                         if asyncio.current_task().cancelled(): raise asyncio.CancelledError()
                         live.update(self.ui.render_thought_panel(thought))
                 
@@ -792,7 +688,6 @@ class UnifiedSecureCLI:
                     else:
                         content = res_attr
                 elif hasattr(response, 'candidates') and len(response.candidates) > 0:
-                    # Fallback for raw candidates (GenAI SDK style)
                     content = response.candidates[0].content.parts[0].text
                 else:
                     content = str(response)
@@ -800,33 +695,27 @@ class UnifiedSecureCLI:
                 if asyncio.current_task().cancelled(): raise asyncio.CancelledError()
                 if "[ENTER_PLAN_MODE]" in content: self.current_mode_idx = 2
                 
-                # [Response Firewall] AI 응답 내용도 전송 직후 마스킹 검사 수행
                 masked_content = self.protector.mask(content, is_response=True)
                 full_text = masked_content
                 
                 live.update(Markdown(self.protector.unmask(full_text)))
                 
             self.last_response = self.protector.unmask(full_text)
-            
-            # Update unified history interface
             self.backend.history.append({"role": "user", "content": user_input})
             self.backend.history.append({"role": "assistant", "content": self.last_response})
 
-            # Auto-compression logic
             max_h = self.config.get('state', {}).get('max_history', 15)
             if self.efficient_mode and len(self.backend.history) > max_h:
                 compressor = ContextCompressor(self.backend)
                 self.backend.history = await compressor.compress(self.backend.history, keep_last=5)
                 self.ui.print_info("[Auto-Compression] History optimized.")
         except asyncio.CancelledError:
-            # Task was aborted via ESC
             self.ui.print_warning("\n[System] 작업이 사용자에 의해 중단되었습니다.")
         except Exception as e: self.ui.print_error(f"Interaction Error: {e}")
         finally:
             self._current_task = None
 
     def _get_ui_stats(self):
-        """Returns the count of GEMINI.md files and loaded skills for the UI."""
         gemini_files = set()
         for p in [self.resolver.GLOBAL_ROOT, self.resolver.PROJECT_ROOT, '.']:
             for f in ['GEMINI.md', 'GEMINI.MD', 'gemini.md']:
@@ -842,16 +731,6 @@ class UnifiedSecureCLI:
             ctx = {'should_reinit': False}
             while not ctx['should_reinit']:
                 try:
-                    # [UI Update] Render status line before prompt
-                    g_files, s_count = self._get_ui_stats()
-                    self.ui.render_status_line(
-                        self.autonomy_level, 
-                        self.modes[self.current_mode_idx],
-                        g_files,
-                        s_count
-                    )
-                    
-                    # Dashboard toolbar function for prompt-toolkit
                     def get_toolbar():
                         return self.ui.get_dashboard_toolbar(
                             self._cached_cwd,
@@ -875,7 +754,6 @@ class UnifiedSecureCLI:
                     user_input = user_input.strip()
                     if not user_input: continue
                     
-                    # Track current task for ESC-abort
                     if user_input.startswith('/'):
                         if await self.commands.handle(user_input, ctx): continue
                         instr = self.plugins.execute_plugin_command(user_input.split()[0].lower())

@@ -1,4 +1,4 @@
-# 🛡️ Humble Custom AI Workstation (v1.8.2)
+# 🛡️ Humble Custom AI Workstation (v1.8.3)
 
 > **Built 100% with Vibe Coding via Gemini CLI (Free Tier)**
 > 
@@ -6,26 +6,25 @@
 
 ---
 
-## 🚀 Key Features (v1.8.2)
+## 🚀 Key Features (v1.8.3)
 
 ### 🔐 Advanced DLP Engine (Core)
 *   **Pure Local Security**: 민감 정보(이메일, 카드번호, API 키 등)를 로컬에서 즉시 마스킹.
-*   **Selective Masking**: 한국어 이름 오탐 문제를 해결하기 위해 고유 명사 마스킹을 제외하고 실질적 민감 정보(SSN, PHONE) 보호에 집중.
+*   **Security Audit Logging**: AI로 전송되는 모든 데이터는 마스킹 완료 후 `logs/security_audit.log`에 기록되어 감사가 가능합니다.
 *   **Response Firewall**: AI의 답변 속에 포함된 잠재적 민감 정보까지 실시간 필터링.
 
 ### 🤖 Intelligent Agentic Control
+*   **@File Auto-Injection**: 질문 시 `@path/to/file` 또는 `@"path with spaces.md"`를 포함하면 자동으로 해당 파일 내용을 읽어 분석에 활용합니다.
 *   **Consolidated Commands**: 유사 기능을 통합하여 사용자 편의성 극대화.
-*   **Korean-Enhanced Autocomplete**: 명령어 입력 시 한글 설명이 포함된 지능형 자동완성 지원.
-*   **SDK Auto-Recovery**: Antigravity SDK 연결 오류 시 자동으로 세션을 복구하는 **능동적 생명주기 관리** 탑재.
-*   **@File Analysis**: 질문 시 `@path/to/file`을 포함하면 자동으로 해당 파일 내용을 읽어 분석에 활용.
+*   **SDK Auto-Recovery**: Antigravity SDK 연결 오류 시 자동으로 세션을 복구하는 능동적 생명주기 관리 탑재.
 
 ---
 
 ## 🛠️ Stability Improvements (v1.8.x)
 
-- **[Fix] Import Error**: 일부 환경에서 `run_in_terminal` 임포트 경로가 어긋나던 문제를 `prompt_toolkit.application` 참조로 수정하여 Docker 환경 안정성 확보.
-- **[Fix] Inline Command Crash**: `Ctrl+I` 입력 시 코루틴 반환값 처리 오류로 발생하던 세션 크래시 해결.
-- **[Fix] UI Rendering**: 제공된 스크린샷 기반으로 하단 6개 컬럼 대시보드 및 정렬된 자동완성 TUI 구현 완료.
+- **[Fix] Input Session Conflict**: `cmd_inline` (Ctrl+I) 실행 시 발생하던 `asyncio.run()` 충돌 문제를 표준 입력 스트림 분리 기법으로 해결했습니다.
+- **[UI] Minimalist Interface**: 불필요한 상태 정보 표시를 제거하고, 오동작 가능성이 있는 명령어 자동완성 기능을 정리하여 핵심 기능의 안정성을 높였습니다.
+- **[Fix] Path Parsing**: 파일 경로에 공백이 포함된 경우(`@workspace/테스트 copy.md`)에도 정확하게 파일을 인식하고 주입하도록 개선되었습니다.
 
 ---
 
@@ -45,20 +44,6 @@
 
 ---
 
-## ⌨️ Productivity Shortcuts
-
-| Shortcut | Action |
-| :--- | :--- |
-| `Shift + Tab` | **Work Mode Cycle** (Default -> Auto-Edit -> Plan) |
-| `Tab + Tab` | **UI Density Toggle** (Full <-> Minimal) |
-| `Esc` | **Abort Current Request** (작업 중단) |
-| `Esc + Esc` | **Visual Rewind UI** 호출 (과거 시점으로 롤백) |
-| `Ctrl + Y` | **Autonomy Toggle** (Always Approve 모드 전환) |
-| `Ctrl + I` | **Inline Command**: 원샷 명령 창 호출 |
-| `?` | 도움말 패널 출력 (입력창이 비었을 때) |
-
----
-
 ## 🛠️ Installation & Setup (Docker Recommended)
 
 ```bash
@@ -75,7 +60,8 @@ docker run -it --rm --env-file .env -v $(pwd):/app/workspace custom-cli
 
 ### 에이전트 모드 답변이 안 나오는 경우
 *   사용 중인 **Google API Key**의 해당 프로젝트에서 **Gemini API 권한**이 활성화되어 있는지 확인하십시오.
-*   `Agent` 모드는 단순 Chat보다 높은 수준의 권한을 요구하므로, API 대시보드에서 할당량(Quota)을 점검하십시오.
+*   API 서버와의 통신 지연이 심할 경우 `AgentBackend`의 `stream_timeout` 설정을 확인하십시오.
+*   `logs/security_audit.log`를 통해 실제 데이터가 서버로 정상 송신되는지 확인할 수 있습니다.
 
 ---
 

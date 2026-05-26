@@ -29,23 +29,6 @@ class UIController:
         # Deprecated in favor of integrated prompt UI, but kept for compatibility
         pass
 
-    def render_status_line(self, autonomy: str, mode: str, files: int, skills: int):
-        if self.detail_mode == "minimal": return
-        width = self.console.width
-        
-        autonomy_text = "auto-accept edits" if autonomy == "always" else "manual review"
-        mode_hint = "Shift+Tab to plan" if mode != "plan" else "Shift+Tab to default"
-        
-        left = f"{autonomy_text} {mode_hint}"
-        right = f"{files} GEMINI.md file{'s' if files != 1 else ''} · {skills} skill{'s' if skills != 1 else ''}"
-        
-        # Calculate spacing for right alignment
-        padding = width - len(left) - len(right)
-        if padding < 1: padding = 1
-        
-        self.console.print("-" * width, style="dim")
-        self.console.print(f"{left}{' ' * padding}{right}")
-
     def get_dashboard_toolbar(self, cwd: str, sandbox: str, model: str, usage: str, backend: str, mode: str):
         if self.detail_mode == "minimal": return ""
         width = self.console.width

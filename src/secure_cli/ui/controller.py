@@ -6,6 +6,7 @@ from rich.panel import Panel
 from rich.live import Live
 from rich.theme import Theme
 from typing import Optional, Any
+from prompt_toolkit.formatted_text import HTML
 
 class UIController:
     """Manages all Rich-based TUI rendering for the workstation."""
@@ -25,24 +26,55 @@ class UIController:
         self.detail_mode = "full"
 
     def render_header(self, mode: str, backend: str):
-        if self.detail_mode == "minimal": return
-        # Ensure clean line start for layout stability
-        self.console.print() 
-        status = f" BACKEND: {backend.upper()} | MODE: {mode.upper()} | ? for help"
-        self.console.print(Panel(status, style="white on #333333", expand=True, padding=(0, 1)))
+        # Deprecated in favor of integrated prompt UI, but kept for compatibility
+        pass
 
-    def render_dashboard(self, cwd: str, sandbox: str, model: str, usage: str):
+    def render_status_line(self, autonomy: str, mode: str, files: int, skills: int):
         if self.detail_mode == "minimal": return
-        grid = Table.grid(expand=True)
-        [grid.add_column(ratio=1) for _ in range(4)]
-        grid.add_row(
-            f"[dim]W:[/dim] {cwd}", 
-            f"[dim]S:[/dim] {sandbox}", 
-            f"[dim]M:[/dim] {model}", 
-            f"[dim]Q:[/dim] {usage}"
+        width = self.console.width
+        
+        autonomy_text = "auto-accept edits" if autonomy == "always" else "manual review"
+        mode_hint = "Shift+Tab to plan" if mode != "plan" else "Shift+Tab to default"
+        
+        left = f"{autonomy_text} {mode_hint}"
+        right = f"{files} GEMINI.md file{'s' if files != 1 else ''} · {skills} skill{'s' if skills != 1 else ''}"
+        
+        # Calculate spacing for right alignment
+        padding = width - len(left) - len(right)
+        if padding < 1: padding = 1
+        
+        self.console.print("-" * width, style="dim")
+        self.console.print(f"{left}{' ' * padding}{right}")
+
+    def get_dashboard_toolbar(self, cwd: str, sandbox: str, model: str, usage: str, backend: str, mode: str):
+        if self.detail_mode == "minimal": return ""
+        width = self.console.width
+        col_width = width // 6  # 6 columns now
+        
+        # Dashboard labels (Top row of toolbar)
+        labels = [
+            f"{'workspace (/directory)':<{col_width}}",
+            f"{'sandbox':<{col_width}}",
+            f"{'backend':<{col_width}}",
+            f"{'work mode':<{col_width}}",
+            f"{'/model':<{col_width}}",
+            f"{'quota':>{width - (col_width * 5)}}"
+        ]
+        
+        # Values (Bottom row of toolbar)
+        values = [
+            f"{cwd:<{col_width}}",
+            f"{sandbox:<{col_width}}",
+            f"{backend.upper():<{col_width}}",
+            f"{mode.upper():<{col_width}}",
+            f"{model:<{col_width}}",
+            f"{usage:>{width - (col_width * 5)}}"
+        ]
+        
+        return HTML(
+            f'<style fg="ansigray">{"".join(labels)}</style>\n'
+            f'{"".join(values)}'
         )
-        self.console.print(grid)
-        self.console.print("-" * self.console.width, style="dim")
 
     def print_info(self, text: str):
         self.console.print(f"[info]{text}[/info]")

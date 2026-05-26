@@ -26,7 +26,7 @@ class ChatBackend:
             self.client = genai.Client(api_key=api_key)
             
             agent_params = self.config_data.get('agent', {})
-            model_name = agent_params.get('model', 'gemini-1.5-flash')
+            model_name = agent_params.get('model', 'gemini-3.5-flash')
             
             self.chat_session = self.client.aio.chats.create(
                 model=model_name,

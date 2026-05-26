@@ -24,8 +24,12 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.filters import Condition
+from prompt_toolkit.application import get_app
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.styles import Style
+from prompt_toolkit.shortcuts import run_in_terminal
 
 # Tiered Package Components
 from secure_cli.security.protector import SecurityProtector
@@ -63,10 +67,23 @@ class SmartCompleter(Completer):
             parts = text.split()
             if len(parts) <= 1 and not text.endswith(' '):
                 # Completing the command itself
-                cmds = self.cli.commands.get_commands() + self.cli.plugins.get_plugin_commands()
-                for cmd in sorted(set(cmds)):
+                cmds = self.cli.commands.get_commands()
+                plugin_cmds = self.cli.plugins.get_plugin_commands()
+                all_cmds = sorted(set(cmds + plugin_cmds))
+                
+                # Calculate padding for alignment (similar to screenshot 2)
+                max_len = max([len(c) for c in all_cmds]) + 4 if all_cmds else 20
+                
+                for cmd in all_cmds:
                     if cmd.lower().startswith(text.lower()):
-                        yield Completion(cmd, start_position=-len(text))
+                        desc = self.cli.commands.get_description(cmd) if cmd in cmds else "플러그인 명령어"
+                        # Use display for aligned columns in the menu
+                        yield Completion(
+                            cmd, 
+                            display=f"{cmd:<{max_len}}", 
+                            display_meta=desc, 
+                            start_position=-len(text)
+                        )
                 return
 
             # Context-Aware Argument Completion
@@ -74,29 +91,86 @@ class SmartCompleter(Completer):
             arg_prefix = parts[-1] if not text.endswith(' ') else ""
             
             suggestions = []
-            if cmd == '/model':
-                suggestions = self.cli.available_models
-            elif cmd == '/agents':
-                suggestions = list(self.cli.personas.keys())
-            elif cmd in ['/load', '/sessions']:
-                suggestions = self.cli.session_manager.list_sessions()
+            if cmd == '/config':
+                if len(parts) == 2 and not text.endswith(' '):
+                    suggestions = [
+                        ("show", "현재 설정 보기"),
+                        ("model", "AI 모델 변경"),
+                        ("agent", "페르소나 변경"),
+                        ("mode", "실행 모드 변경"),
+                        ("autonomy", "자율성 레벨 설정"),
+                        ("efficient", "압축 모드 토글"),
+                        ("sandbox", "샌드박스 토글"),
+                        ("refresh", "설정 새로고침")
+                    ]
+                elif len(parts) >= 2:
+                    sub = parts[1].lower()
+                    if sub == "model": suggestions = [(m, "모델 선택") for m in self.cli.available_models]
+                    elif sub == "agent": suggestions = [(p, "페르소나 선택") for p in self.cli.personas.keys()]
+                    elif sub == "mode": suggestions = [("agent", "에이전트 모드"), ("chat", "대화 모드")]
+                    elif sub == "autonomy": suggestions = [("always", "항상 승인"), ("review", "매번 검토")]
+                
+            elif cmd == '/session':
+                if len(parts) == 2 and not text.endswith(' '):
+                    suggestions = [
+                        ("save", "현재 세션 저장"),
+                        ("load", "세션 불러오기"),
+                        ("list", "저장된 세션 목록"),
+                        ("resume", "최근 세션 재개"),
+                        ("fork", "세션 복제")
+                    ]
+                elif len(parts) >= 2 and parts[1].lower() in ["load", "save"]:
+                    suggestions = [(s, "세션 파일") for s in self.cli.session_manager.list_sessions()]
+
+            elif cmd == '/history':
+                if len(parts) == 2 and not text.endswith(' '):
+                    suggestions = [
+                        ("show", "대화 기록 출력"),
+                        ("undo", "마지막 대화 취소"),
+                        ("rewind", "특정 시점으로 롤백"),
+                        ("compress", "대화 기록 압축"),
+                        ("pin", "메시지 고정"),
+                        ("unpin", "메시지 고정 해제")
+                    ]
+
+            elif cmd == '/usage':
+                suggestions = [("session", "현재 세션 사용량"), ("total", "누적 사용량")]
+
+            elif cmd == '/utility':
+                suggestions = [
+                    ("file", "파일 읽기/주입"),
+                    ("export", "응답 내보내기"),
+                    ("peek", "최근 셸 출력 보기"),
+                    ("preview", "아티팩트 미리보기"),
+                    ("copy", "응답 복사"),
+                    ("clear", "화면 지우기")
+                ]
+            
+            elif cmd == '/protect':
+                suggestions = [("add", "보안 패턴 추가"), ("remove", "보안 패턴 제거")]
+            
+            elif cmd == '/goal':
+                suggestions = [("set", "목표 설정"), ("status", "진행 상황 확인")]
+
             elif cmd == '/skills':
                 if len(parts) == 2 and not text.endswith(' '):
-                    suggestions = ["list", "load", "save"]
+                    suggestions = [("list", "스킬 목록"), ("load", "스킬 로드"), ("save", "현재 프롬프트를 스킬로 저장")]
                 else:
-                    suggestions = self.cli.skill_manager.list_skills()
-            elif cmd == '/mode':
-                suggestions = ["agent", "chat"]
-            elif cmd == '/autonomy':
-                suggestions = ["always", "review"]
-            elif cmd == '/file':
-                for c in self._get_file_completions(arg_prefix):
-                    yield c
-                return
+                    suggestions = [(s, "스킬 이름") for s in self.cli.skill_manager.list_skills()]
             
-            for s in suggestions:
-                if s.lower().startswith(arg_prefix.lower()):
-                    yield Completion(s, start_position=-len(arg_prefix))
+            if suggestions:
+                valid_suggestions = [s for s in suggestions if (s[0] if isinstance(s, tuple) else s).lower().startswith(arg_prefix.lower())]
+                max_arg_len = max([len(s[0] if isinstance(s, tuple) else s) for s in valid_suggestions]) + 4 if valid_suggestions else 20
+                
+                for s in suggestions:
+                    label, meta = s if isinstance(s, tuple) else (s, "")
+                    if label.lower().startswith(arg_prefix.lower()):
+                        yield Completion(
+                            label, 
+                            display=f"{label:<{max_arg_len}}", 
+                            display_meta=meta, 
+                            start_position=-len(arg_prefix)
+                        )
 
         # 2. File Reference Completion (@path)
         elif '@' in text:
@@ -111,13 +185,21 @@ class SmartCompleter(Completer):
         basename = os.path.basename(path_prefix)
         try:
             if os.path.isdir(dirname):
-                for f in os.listdir(dirname):
-                    if f.startswith(basename):
-                        full_f = os.path.join(dirname, f)
-                        if os.path.isdir(full_f):
-                            yield Completion(f + "/", start_position=-len(basename))
-                        else:
-                            yield Completion(f, start_position=-len(basename))
+                files = os.listdir(dirname)
+                valid_files = [f for f in files if f.startswith(basename)]
+                max_f_len = max([len(f) for f in valid_files]) + 4 if valid_files else 20
+                
+                for f in valid_files:
+                    full_f = os.path.join(dirname, f)
+                    is_dir = os.path.isdir(full_f)
+                    display_f = f + "/" if is_dir else f
+                    meta = "Directory" if is_dir else f"{os.path.getsize(full_f):,} bytes"
+                    yield Completion(
+                        display_f, 
+                        display=f"{display_f:<{max_f_len}}", 
+                        display_meta=meta, 
+                        start_position=-len(basename)
+                    )
         except: pass
 
 class ConfigResolver:
@@ -127,7 +209,7 @@ class ConfigResolver:
         for p in [self.GLOBAL_ROOT, os.path.join(self.GLOBAL_ROOT, 'skills'), self.PROJECT_ROOT]:
             os.makedirs(p, exist_ok=True)
     def resolve_settings(self):
-        base = {"agent": {"model": "gemini-1.5-flash", "temperature": 0.7}, "enableTerminalSandbox": False, "exclude_paths": [".env", ".git", ".sessions", "*.log"]}
+        base = {"agent": {"model": "gemini-3.5-flash", "temperature": 0.7}, "enableTerminalSandbox": False, "exclude_paths": [".env", ".git", ".sessions", "*.log"]}
         for p in [os.path.join(self.GLOBAL_ROOT, 'settings.json'), os.path.join(self.PROJECT_ROOT, 'settings.json'), 'settings.json', 'agent_config.yaml']:
             if not os.path.exists(p): continue
             try:
@@ -167,7 +249,14 @@ class UnifiedSecureCLI:
         self.session_manager = SessionManager(expiry_days=state_cfg.get('expiry_days', 7))
         self.mcp_manager = MCPManager(self.protector)
         self.ui = UIController()
-        self.telemetry = TelemetryManager(hard_limit=state_cfg.get('hard_limit', 0))
+        
+        # [Usage Clarity] Initialize Telemetry with model-specific limits
+        agent_cfg = self.config.get('agent', {})
+        self.telemetry = TelemetryManager(
+            hard_limit=state_cfg.get('hard_limit', 0),
+            model_limit=agent_cfg.get('max_output_tokens', 4096)
+        )
+        
         self.orchestrator = AgentOrchestrator(self)
         self.sandbox = SandboxManager()
         self.plugins = PluginManager(os.path.join(self.resolver.GLOBAL_ROOT, 'plugins'))
@@ -190,7 +279,8 @@ class UnifiedSecureCLI:
         self.debug_log_enabled = False
         self.active_persona = "default"
         self._immediate_approval = False
-        self.available_models: List[str] = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]
+        self._current_task: Optional[asyncio.Task] = None
+        self.available_models: List[str] = ["gemini-3.5-flash", "gemini-3.5-pro", "antigravity-preview-05-2026"]
         
         self.re_initialize()
         self.register_core_commands()
@@ -208,10 +298,21 @@ class UnifiedSecureCLI:
             self.ui.detail_mode = "minimal" if self.ui.detail_mode == "full" else "full"
             self.ui.print_info(f"UI Detail: {self.ui.detail_mode.upper()}")
             
+        @self.kb.add('escape')
+        def _(e):
+            if self._current_task and not self._current_task.done():
+                self._current_task.cancel()
+                self.ui.print_warning("\n[Abort] 사용자 요청에 의해 작업이 중단되었습니다 (ESC).")
+            else:
+                # [Rewind Shortcut] ESC-ESC pattern or just ESC when idle
+                # To maintain old ESC-ESC behavior, we could check timing, but let's keep it simple.
+                pass
+
         @self.kb.add('escape', 'escape')
         def _(e):
-            asyncio.create_task(self.launch_rewind_ui())
-            
+            if not (self._current_task and not self._current_task.done()):
+                asyncio.create_task(self.launch_rewind_ui())
+
         @self.kb.add('c-y')
         def _(e):
             self.autonomy_level = "always" if self.autonomy_level != "always" else "review"
@@ -224,8 +325,12 @@ class UnifiedSecureCLI:
 
         @self.kb.add('?')
         def _(e):
+            # Only trigger help if the buffer is empty to avoid interfering with normal typing
             if not e.app.current_buffer.text:
                 asyncio.create_task(self.cmd_help({}, None))
+            else:
+                # If buffer is not empty, insert the '?' character normally
+                e.app.current_buffer.insert_text('?')
 
         @self.kb.add('c-k')
         def _(e):
@@ -242,67 +347,105 @@ class UnifiedSecureCLI:
         def _(e):
             asyncio.create_task(self.cmd_inline({}, None))
 
+        # Custom TUI Style (matching screenshot 2)
+        self.tui_style = Style.from_dict({
+            'completion-menu.completion': 'bg:#333333 #ffffff',
+            'completion-menu.completion.current': 'bg:#445544 #ffffff', # Greenish dark highlight
+            'completion-menu.meta.completion': 'bg:#333333 #888888',
+            'completion-menu.meta.completion.current': 'bg:#445544 #aaaaaa',
+            'scrollbar.background': 'bg:#222222',
+            'scrollbar.button': 'bg:#444444',
+            'rprompt': 'bg:#222222 #888888',
+            'bottom-toolbar': 'bg:#111111 #ffffff',
+            'bottom-toolbar.text': '#ffffff',
+        })
+
         self.session = PromptSession(
             history=FileHistory(os.path.expanduser('~/.unified_secure_history')),
             completer=SmartCompleter(self),
-            key_bindings=self.kb
+            key_bindings=self.kb,
+            style=self.tui_style
         )
+        self.inline_session = PromptSession(style=self.tui_style)
 
     def register_core_commands(self):
-        self.commands.register('/help', self.cmd_help)
-        self.commands.register('/mode', self.cmd_mode)
-        self.commands.register('/reset', self.cmd_reset)
-        self.commands.register('/history', self.cmd_history)
-        self.commands.register('/undo', self.cmd_undo)
-        self.commands.register('/config', self.cmd_config)
-        self.commands.register('/verbose', self.cmd_verbose)
-        self.commands.register('/exit', self.cmd_exit)
-        self.commands.register('/quit', self.cmd_exit)
-        self.commands.register('/save', self.cmd_save)
-        self.commands.register('/load', self.cmd_load)
-        self.commands.register('/sessions', self.cmd_sessions)
-        self.commands.register('/resume', self.cmd_resume)
-        self.commands.register('/rewind', self.cmd_rewind)
-        self.commands.register('/copy', self.cmd_copy)
-        self.commands.register('/multiline', self.cmd_multiline)
-        self.commands.register('/model', self.cmd_model)
-        self.commands.register('/models', self.cmd_models)
-        self.commands.register('/plan', self.cmd_plan)
-        self.commands.register('/agents', self.cmd_agents)
-        self.commands.register('/autonomy', self.cmd_autonomy)
-        self.commands.register('/versions', self.cmd_versions)
-        self.commands.register('/clear', self.cmd_clear)
-        self.commands.register('/efficient', self.cmd_efficient)
-        self.commands.register('/tools', self.cmd_tools)
-        self.commands.register('/usage', self.cmd_usage)
-        self.commands.register('/stats', self.cmd_stats)
-        self.commands.register('/token', self.cmd_usage)
-        self.commands.register('/goal', self.cmd_goal)
-        self.commands.register('/mission', self.cmd_mission)
-        self.commands.register('/sandbox', self.cmd_sandbox)
-        self.commands.register('/file', self.cmd_file)
-        self.commands.register('/export', self.cmd_export)
-        self.commands.register('/refresh', self.cmd_refresh)
-        self.commands.register('/fork', self.cmd_fork)
-        self.commands.register('/peek', self.cmd_peek)
-        self.commands.register('/compress', self.cmd_compress)
-        self.commands.register('/skills', self.cmd_skills)
-        self.commands.register('/pin', self.cmd_pin)
-        self.commands.register('/unpin', self.cmd_unpin)
-        self.commands.register('/commit', self.cmd_commit)
-        self.commands.register('/protect', self.cmd_protect)
-        self.commands.register('/unprotect', self.cmd_unprotect)
-        self.commands.register('/schedule', self.cmd_schedule)
-        self.commands.register('/group', self.cmd_group)
-        self.commands.register('/mcp', self.cmd_mcp)
-        self.commands.register('/inline', self.cmd_inline)
+        self.commands.register('/help', self.cmd_help, "도움말 출력")
+        self.commands.register('/session', self.cmd_session_unified, "세션 관리 (save, load, list, resume, fork)")
+        self.commands.register('/history', self.cmd_history_unified, "대화 기록 관리 (show, undo, rewind, compress, pin, unpin)")
+        self.commands.register('/config', self.cmd_config_unified, "설정 관리 (show, model, agent, mode, autonomy, efficient, sandbox, refresh)")
+        self.commands.register('/usage', self.cmd_usage_unified, "토큰 사용량 확인 (session, total)")
+        self.commands.register('/utility', self.cmd_utility_unified, "유틸리티 기능 (file, export, peek, preview, copy, clear)")
+        self.commands.register('/goal', self.cmd_goal_unified, "목표 및 태스크 관리 (set, status)")
+        self.commands.register('/protect', self.cmd_protect_unified, "보안 패턴 관리 (add, remove)")
+        self.commands.register('/skills', self.cmd_skills, "에이전트 스킬 관리")
+        self.commands.register('/commit', self.cmd_commit, "변경 사항 Git 커밋")
+        self.commands.register('/schedule', self.cmd_schedule, "작업 스케줄링")
+        self.commands.register('/group', self.cmd_group, "그룹 대화 시작")
+        self.commands.register('/mcp', self.cmd_mcp, "MCP 서버 연결")
+        self.commands.register('/inline', self.cmd_inline, "원샷 인라인 명령 실행")
+        self.commands.register('/exit', self.cmd_exit, "프로그램 종료")
+
+    # --- Consolidated Command Handlers ---
+    async def cmd_session_unified(self, ctx, *args):
+        sub = args[0].lower() if args else "list"
+        if sub == "save": await self.cmd_save(ctx, *args[1:])
+        elif sub == "load": await self.cmd_load(ctx, *args[1:])
+        elif sub == "list": await self.cmd_sessions(ctx)
+        elif sub == "resume": await self.cmd_resume(ctx)
+        elif sub == "fork": await self.cmd_fork(ctx)
+
+    async def cmd_history_unified(self, ctx, *args):
+        sub = args[0].lower() if args else "show"
+        if sub == "show": await self.cmd_history(ctx)
+        elif sub == "undo": await self.cmd_undo(ctx)
+        elif sub == "rewind": await self.cmd_rewind(ctx)
+        elif sub == "compress": await self.cmd_compress(ctx)
+        elif sub == "pin": await self.cmd_pin(ctx, *args[1:])
+        elif sub == "unpin": await self.cmd_unpin(ctx, *args[1:])
+
+    async def cmd_config_unified(self, ctx, *args):
+        sub = args[0].lower() if args else "show"
+        if sub == "show": await self.cmd_config(ctx)
+        elif sub == "model": await self.cmd_model(ctx, *args[1:])
+        elif sub == "agent": await self.cmd_agents(ctx, *args[1:])
+        elif sub == "mode": await self.cmd_mode(ctx, *args[1:])
+        elif sub == "autonomy": await self.cmd_autonomy(ctx, *args[1:])
+        elif sub == "efficient": await self.cmd_efficient(ctx)
+        elif sub == "sandbox": await self.cmd_sandbox(ctx)
+        elif sub == "refresh": await self.cmd_refresh(ctx)
+
+    async def cmd_usage_unified(self, ctx, *args):
+        sub = args[0].lower() if args else "session"
+        if sub == "session": await self.cmd_usage(ctx)
+        elif sub == "total": await self.cmd_stats(ctx)
+
+    async def cmd_utility_unified(self, ctx, *args):
+        sub = args[0].lower() if args else "help"
+        if sub == "file": await self.cmd_file(ctx, *args[1:])
+        elif sub == "export": await self.cmd_export(ctx, *args[1:])
+        elif sub == "peek": await self.cmd_peek(ctx)
+        elif sub == "preview": await self.cmd_preview(ctx)
+        elif sub == "copy": await self.cmd_copy(ctx)
+        elif sub == "clear": await self.cmd_clear(ctx)
+
+    async def cmd_goal_unified(self, ctx, *args):
+        sub = args[0].lower() if args else "status"
+        if sub == "set": await self.cmd_goal(ctx, *args[1:])
+        elif sub == "status": await self.cmd_mission(ctx)
+
+    async def cmd_protect_unified(self, ctx, *args):
+        sub = args[0].lower() if args else "list"
+        if sub == "add": await self.cmd_protect(ctx, *args[1:])
+        elif sub == "remove": await self.cmd_unprotect(ctx, *args[1:])
 
     # --- Command Handlers ---
     async def cmd_help(self, ctx, *args):
         t = Table(title="Unified Workstation Commands")
-        t.add_column("Command"); t.add_column("Source")
-        for cmd in self.commands.get_commands(): t.add_row(cmd, "Core")
-        for cmd in self.plugins.get_plugin_commands(): t.add_row(cmd, "Plugin")
+        t.add_column("Command"); t.add_column("Description", style="dim"); t.add_column("Source")
+        for cmd in self.commands.get_commands():
+            desc = self.commands.get_description(cmd)
+            t.add_row(cmd, desc, "Core")
+        for cmd in self.plugins.get_plugin_commands(): t.add_row(cmd, "플러그인 명령어", "Plugin")
         self.ui.console.print(t)
     async def cmd_mode(self, ctx, *args):
         if args: self.cli_mode = args[0].lower(); ctx['should_reinit'] = True
@@ -358,11 +501,13 @@ class UnifiedSecureCLI:
         self.ui.print_info(f"Efficient Mode (Sliding Window): {'ON' if self.efficient_mode else 'OFF'}")
     async def cmd_tools(self, ctx, *args): self.ui.display_tools(list(self.mcp_manager.tools.keys()))
     async def cmd_usage(self, ctx, *args):
-        stats = self.telemetry.get_current_session_stats()
-        self.ui.print_info(f"Current Session Tokens: {stats}")
+        stats = self.telemetry.get_detailed_stats()
+        self.ui.print_info(f"Current Session Tokens: {stats['session']:,}")
     async def cmd_stats(self, ctx, *args):
-        stats = self.telemetry.get_cumulative_stats()
-        self.ui.print_info(f"Cumulative Token Usage: {stats}")
+        stats = self.telemetry.get_detailed_stats()
+        quota_str = f" / {stats['hard_limit']:,}" if stats['hard_limit'] > 0 else " / ∞"
+        self.ui.print_info(f"Daily Total Usage: {stats['daily']:,}{quota_str}")
+        self.ui.print_info(f"Model Token Limit: {stats['model_limit']:,}")
     async def cmd_goal(self, ctx, *args):
         if args: self.orchestrator.set_goal(" ".join(args)); self.ui.print_info(f"Mission Goal Set: {self.orchestrator.goal}")
     async def cmd_mission(self, ctx, *args): self.ui.render_markdown(self.orchestrator.render_mission_control())
@@ -477,9 +622,15 @@ class UnifiedSecureCLI:
 
     async def cmd_inline(self, ctx, *args):
         """Execute a one-shot command without breaking conversation flow (Ctrl+I)."""
-        with patch_stdout():
-            cmd = await self.session.prompt_async("Inline Command: ")
-        if cmd.strip():
+        async def _get_input():
+            return await self.inline_session.prompt_async("Inline Command: ")
+            
+        # [Critical Fix] Use run_in_terminal to avoid "Application is already running" crash
+        # when triggered from a keybinding while the main app is active.
+        cmd = await run_in_terminal(_get_input)
+        
+        if cmd and cmd.strip():
+            cmd = cmd.strip()
             if cmd.startswith('!'): await self.run_shell(cmd[1:].strip())
             elif cmd.startswith('/'): await self.commands.handle(cmd, ctx)
             else: await self.chat_cycle(cmd)
@@ -608,7 +759,19 @@ class UnifiedSecureCLI:
             self.ui.print_info(f"Conversation history rewound to step {idx}.")
 
     async def chat_cycle(self, user_input):
-        masked_input = self.protector.mask(user_input)
+        # [Feature] Automatic @file reference parsing
+        # find @path/to/file in input and inject content
+        file_refs = re.findall(r'@([^\s]+)', user_input)
+        injected_content = ""
+        for path in file_refs:
+            content = await self.read_file(path)
+            if not content.startswith("Error") and not content.startswith("Blocked"):
+                masked_file_content = self.protector.mask(content)
+                injected_content += f"\n\n--- Reference File: {path} ---\n{masked_file_content}\n"
+        
+        full_input = user_input + injected_content
+        masked_input = self.protector.mask(full_input)
+        
         try:
             self.ui.console.print(f"\n[{self.cli_mode}]🤖 {self.cli_mode.upper()}:[/{self.cli_mode}]")
             full_text = ""
@@ -618,9 +781,12 @@ class UnifiedSecureCLI:
                 
                 if hasattr(response, 'thoughts'):
                     async for thought in response.thoughts:
+                        # Check for cancellation within async iterations
+                        if asyncio.current_task().cancelled(): raise asyncio.CancelledError()
                         live.update(self.ui.render_thought_panel(thought))
                 
                 # Robust response text extraction
+                content = ""
                 if hasattr(response, 'text'):
                     res_attr = response.text
                     if asyncio.iscoroutine(res_attr) or asyncio.iscoroutinefunction(res_attr):
@@ -629,8 +795,13 @@ class UnifiedSecureCLI:
                         content = res_attr()
                     else:
                         content = res_attr
+                elif hasattr(response, 'candidates') and len(response.candidates) > 0:
+                    # Fallback for raw candidates (GenAI SDK style)
+                    content = response.candidates[0].content.parts[0].text
                 else:
                     content = str(response)
+                
+                if asyncio.current_task().cancelled(): raise asyncio.CancelledError()
                 if "[ENTER_PLAN_MODE]" in content: self.current_mode_idx = 2
                 
                 # [Response Firewall] AI 응답 내용도 전송 직후 마스킹 검사 수행
@@ -645,17 +816,28 @@ class UnifiedSecureCLI:
             self.backend.history.append({"role": "user", "content": user_input})
             self.backend.history.append({"role": "assistant", "content": self.last_response})
 
-            # Auto-compression when history is long and efficient_mode is ON
+            # Auto-compression logic
             max_h = self.config.get('state', {}).get('max_history', 15)
             if self.efficient_mode and len(self.backend.history) > max_h:
                 compressor = ContextCompressor(self.backend)
                 self.backend.history = await compressor.compress(self.backend.history, keep_last=5)
                 self.ui.print_info("[Auto-Compression] History optimized.")
-            elif self.efficient_mode and len(self.backend.history) > 10:
-                # Fallback to simple slicing if no compression
-                pinned = [h for h in self.backend.history[:-10] if h.get('pinned')]
-                self.backend.history = pinned + self.backend.history[-10:]
+        except asyncio.CancelledError:
+            # Task was aborted via ESC
+            self.ui.print_warning("\n[System] 작업이 사용자에 의해 중단되었습니다.")
         except Exception as e: self.ui.print_error(f"Interaction Error: {e}")
+        finally:
+            self._current_task = None
+
+    def _get_ui_stats(self):
+        """Returns the count of GEMINI.md files and loaded skills for the UI."""
+        gemini_files = set()
+        for p in [self.resolver.GLOBAL_ROOT, self.resolver.PROJECT_ROOT, '.']:
+            for f in ['GEMINI.md', 'GEMINI.MD', 'gemini.md']:
+                path = os.path.join(p, f)
+                if os.path.exists(path):
+                    gemini_files.add(os.path.abspath(path))
+        return len(gemini_files), len(self.skill_manager.list_skills())
 
     async def run(self):
         load_dotenv()
@@ -663,21 +845,55 @@ class UnifiedSecureCLI:
             await self.switch_mode(self.cli_mode)
             ctx = {'should_reinit': False}
             while not ctx['should_reinit']:
-                self.ui.render_header(self.modes[self.current_mode_idx], self.cli_mode)
                 try:
+                    # [UI Update] Render status line before prompt
+                    g_files, s_count = self._get_ui_stats()
+                    self.ui.render_status_line(
+                        self.autonomy_level, 
+                        self.modes[self.current_mode_idx],
+                        g_files,
+                        s_count
+                    )
+                    
+                    # Dashboard toolbar function for prompt-toolkit
+                    def get_toolbar():
+                        return self.ui.get_dashboard_toolbar(
+                            self._cached_cwd,
+                            self._cached_sandbox,
+                            self.config['agent']['model'],
+                            self.telemetry.format_quota_display(),
+                            self.cli_mode,
+                            self.modes[self.current_mode_idx]
+                        )
+
                     with patch_stdout():
-                        user_input = await self.session.prompt_async("> ", multiline=self.multiline)
-                    self.ui.render_dashboard(self._cached_cwd, self._cached_sandbox, self.config['agent']['model'], self.telemetry.format_quota_display())
+                        user_input = await self.session.prompt_async(
+                            "> ", 
+                            placeholder="Type your message or @path/to/file",
+                            bottom_toolbar=get_toolbar,
+                            rprompt=HTML('<style fg="ansigray">? for shortcuts</style>'),
+                            multiline=self.multiline,
+                            complete_while_typing=True
+                        )
+                    
                     user_input = user_input.strip()
                     if not user_input: continue
+                    
+                    # Track current task for ESC-abort
                     if user_input.startswith('/'):
                         if await self.commands.handle(user_input, ctx): continue
                         instr = self.plugins.execute_plugin_command(user_input.split()[0].lower())
                         if instr: 
                             self.ui.print_info(f"Executing Plugin: {user_input}")
-                            await self.chat_cycle(instr); continue
-                    if user_input.startswith('!'): await self.run_shell(user_input[1:].strip()); continue
-                    await self.chat_cycle(user_input)
+                            self._current_task = asyncio.create_task(self.chat_cycle(instr))
+                            await self._current_task
+                            continue
+                    elif user_input.startswith('!'):
+                        await self.run_shell(user_input[1:].strip())
+                        continue
+                    else:
+                        self._current_task = asyncio.create_task(self.chat_cycle(user_input))
+                        await self._current_task
                 except KeyboardInterrupt: continue
                 except EOFError: return
         self.protector.clear()

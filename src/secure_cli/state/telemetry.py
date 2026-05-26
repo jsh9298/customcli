@@ -7,46 +7,38 @@ class QuotaExceededError(Exception):
 class TelemetryManager:
     """
     사용량 추적, 토큰 메트릭 및 SDK 메타데이터 관리 클래스.
-    - Quota Enforcement (하드 리밋) 기능 포함.
+    - 세션별, 일일별, 모델별 제한 수치를 명확히 구분합니다.
     """
     
-    def __init__(self, hard_limit: int = 0):
+    def __init__(self, hard_limit: int = 0, model_limit: int = 4096):
         self.last_usage: Any = None
-        self.total_prompt_tokens = 0
-        self.total_candidates_tokens = 0
-        self.total_tokens = 0
-        self.hard_limit = hard_limit # 0 means unlimited
+        self.session_tokens = 0
+        self.daily_tokens = 0  # 실제 운영시 파일/DB 연동 필요
+        self.model_limit = model_limit  # 모델의 최대 출력 토큰 (또는 컨텍스트 범위)
+        self.hard_limit = hard_limit   # 일일 또는 계정별 하드 리밋 (0은 무제한)
 
     def update_usage(self, usage_metadata: Any):
         if not usage_metadata: return
         
         new_tokens = getattr(usage_metadata, 'total_token_count', 0)
         
-        if self.hard_limit > 0 and (self.total_tokens + new_tokens) > self.hard_limit:
-            raise QuotaExceededError(f"API Quota Exceeded: {self.total_tokens + new_tokens} > {self.hard_limit}")
+        if self.hard_limit > 0 and (self.daily_tokens + new_tokens) > self.hard_limit:
+            raise QuotaExceededError(f"일일 할당량 초과 (Daily Quota Exceeded): {self.daily_tokens + new_tokens} > {self.hard_limit}")
 
         self.last_usage = usage_metadata
-        self.total_prompt_tokens += getattr(usage_metadata, 'prompt_token_count', 0)
-        self.total_candidates_tokens += getattr(usage_metadata, 'candidates_token_count', 0)
-        self.total_tokens += new_tokens
+        self.session_tokens += new_tokens
+        self.daily_tokens += new_tokens
 
-    def get_current_session_stats(self) -> dict:
-        if not self.last_usage:
-            return {}
+    def get_detailed_stats(self) -> dict:
         return {
-            "prompt_tokens": getattr(self.last_usage, 'prompt_token_count', 0),
-            "candidates_tokens": getattr(self.last_usage, 'candidates_token_count', 0),
-            "total_tokens": getattr(self.last_usage, 'total_token_count', 0)
-        }
-
-    def get_cumulative_stats(self) -> dict:
-        return {
-            "total_prompt_tokens": self.total_prompt_tokens,
-            "total_candidates_tokens": self.total_candidates_tokens,
-            "total_tokens": self.total_tokens
+            "session": self.session_tokens,
+            "daily": self.daily_tokens,
+            "hard_limit": self.hard_limit,
+            "model_limit": self.model_limit,
+            "last_request": getattr(self.last_usage, 'total_token_count', 0) if self.last_usage else 0
         }
 
     def format_quota_display(self) -> str:
-        total = getattr(self.last_usage, 'total_token_count', 0) if self.last_usage else 0
-        limit_str = f"/{self.hard_limit:,}" if self.hard_limit > 0 else ""
-        return f"{total:,}{limit_str}"
+        """대시보드용 간략 표시: [세션]/[일일 할당량]"""
+        daily_str = f"/{self.hard_limit:,}" if self.hard_limit > 0 else "/∞"
+        return f"S:{self.session_tokens:,} D:{self.daily_tokens:,}{daily_str}"

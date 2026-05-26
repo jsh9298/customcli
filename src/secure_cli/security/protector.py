@@ -18,6 +18,7 @@ class SecurityProtector:
         self._unmask_map: Dict[str, str] = {}
         self.patterns: Dict[str, str] = {}
         self.guardrails: List[str] = []
+        self.whitelist: List[str] = []
         self.mask_cache: Dict[str, str] = {} # Content hash -> Masked text
         self.logger = logging.getLogger("Protector")
         self.session_id = str(uuid.uuid4())[:8]
@@ -30,7 +31,8 @@ class SecurityProtector:
                     config = yaml.safe_load(f) or {}
                     self.patterns = config.get('patterns', {})
                     self.guardrails = config.get('guardrails', [])
-                    self.logger.info(f"Loaded {len(self.patterns)} patterns and {len(self.guardrails)} guardrails.")
+                    self.whitelist = config.get('whitelist', [])
+                    self.logger.info(f"Loaded {len(self.patterns)} patterns, {len(self.guardrails)} guardrails, and {len(self.whitelist)} whitelist items.")
             except Exception as e:
                 self.logger.error(f"Config load error: {e}")
                 self._set_default_patterns()
@@ -69,6 +71,11 @@ class SecurityProtector:
 
         def replace_match(match):
             val = match.group(0)
+            
+            # Skip masking if the value is in the whitelist
+            if val in self.whitelist:
+                return val
+                
             if val in self._mask_map:
                 return self._mask_map[val]
             

@@ -62,9 +62,116 @@ class SmartCompleter(Completer):
     def get_completions(self, document, complete_event):
         text = document.text_before_cursor
         
-        # [Disabled] Slash Command & Argument Completion as requested (avoids loop errors)
+        # 1. Slash Command & Argument Completion
         if text.startswith('/'):
-            return
+            parts = text.split()
+            if len(parts) <= 1 and not text.endswith(' '):
+                # Completing the command itself
+                cmds = self.cli.commands.get_commands()
+                plugin_cmds = self.cli.plugins.get_plugin_commands()
+                all_cmds = sorted(set(cmds + plugin_cmds))
+                
+                # Calculate padding for alignment (similar to screenshot 2)
+                max_len = max([len(c) for c in all_cmds]) + 4 if all_cmds else 20
+                
+                for cmd in all_cmds:
+                    if cmd.lower().startswith(text.lower()):
+                        desc = self.cli.commands.get_description(cmd) if cmd in cmds else "플러그인 명령어"
+                        # Use display for aligned columns in the menu
+                        yield Completion(
+                            cmd, 
+                            display=f"{cmd:<{max_len}}", 
+                            display_meta=desc, 
+                            start_position=-len(text)
+                        )
+                return
+
+            # Context-Aware Argument Completion
+            cmd = parts[0].lower()
+            arg_prefix = parts[-1] if not text.endswith(' ') else ""
+            
+            suggestions = []
+            if cmd == '/config':
+                if len(parts) == 2 and not text.endswith(' '):
+                    suggestions = [
+                        ("show", "현재 설정 보기"),
+                        ("model", "AI 모델 변경"),
+                        ("agent", "페르소나 변경"),
+                        ("mode", "실행 모드 변경"),
+                        ("autonomy", "자율성 레벨 설정"),
+                        ("efficient", "압축 모드 토글"),
+                        ("sandbox", "샌드박스 토글"),
+                        ("refresh", "설정 새로고침")
+                    ]
+                elif len(parts) >= 2:
+                    sub = parts[1].lower()
+                    if sub == "model": suggestions = [(m, "모델 선택") for m in self.cli.available_models]
+                    elif sub == "agent": suggestions = [(p, "페르소나 선택") for p in self.cli.personas.keys()]
+                    elif sub == "mode": suggestions = [("agent", "에이전트 모드"), ("chat", "대화 모드")]
+                    elif sub == "autonomy": suggestions = [("always", "항상 승인"), ("review", "매번 검토")]
+                
+            elif cmd == '/session':
+                if len(parts) == 2 and not text.endswith(' '):
+                    suggestions = [
+                        ("save", "현재 세션 저장"),
+                        ("load", "세션 불러오기"),
+                        ("list", "저장된 세션 목록"),
+                        ("resume", "최근 세션 재개"),
+                        ("fork", "세션 복제")
+                    ]
+                elif len(parts) >= 2 and parts[1].lower() in ["load", "save"]:
+                    suggestions = [(s, "세션 파일") for s in self.cli.session_manager.list_sessions()]
+
+            elif cmd == '/history':
+                if len(parts) == 2 and not text.endswith(' '):
+                    suggestions = [
+                        ("show", "대화 기록 출력"),
+                        ("undo", "마지막 대화 취소"),
+                        ("rewind", "특정 시점으로 롤백"),
+                        ("compress", "대화 기록 압축"),
+                        ("pin", "메시지 고정"),
+                        ("unpin", "메시지 고정 해제")
+                    ]
+
+            elif cmd == '/usage':
+                suggestions = [("session", "현재 세션 사용량"), ("total", "누적 사용량")]
+
+            elif cmd == '/utility':
+                suggestions = [
+                    ("file", "파일 읽기/주입"),
+                    ("export", "응답 내보내기"),
+                    ("peek", "최근 셸 출력 보기"),
+                    ("preview", "아티팩트 미리보기"),
+                    ("copy", "응답 복사"),
+                    ("clear", "화면 지우기")
+                ]
+            
+            elif cmd == '/protect':
+                suggestions = [("add", "보안 패턴 추가"), ("remove", "보안 패턴 제거")]
+            
+            elif cmd == '/goal':
+                suggestions = [("set", "목표 설정"), ("status", "진행 상황 확인")]
+
+            elif cmd == '/skills':
+                if len(parts) == 2 and not text.endswith(' '):
+                    suggestions = [("list", "스킬 목록"), ("load", "스킬 로드"), ("save", "현재 프롬프트를 스킬로 저장")]
+                else:
+                    suggestions = [(s, "스킬 이름") for s in self.cli.skill_manager.list_skills()]
+            
+            if suggestions:
+                valid_suggestions = [s for s in suggestions if (s[0] if isinstance(s, tuple) else s).lower().startswith(arg_prefix.lower())]
+                max_arg_len = max([len(s[0] if isinstance(s, tuple) else s) for s in valid_suggestions]) + 4 if valid_suggestions else 20
+                
+                for s in suggestions:
+                    label, meta = s if isinstance(s, tuple) else (s, "")
+                    if label.lower().startswith(arg_prefix.lower()):
+                        yield Completion(
+                            label, 
+                            display=f"{label:<{max_arg_len}}", 
+                            display_meta=meta, 
+                            start_position=-len(arg_prefix)
+                        )
+                return
 
         # 2. File Reference Completion (@path)
         if '@' in text:

@@ -30,8 +30,9 @@ class PayloadLogger:
         }
         self.logger.info(f"Payload Outgoing ({backend}):\n{json.dumps(entry, ensure_ascii=False, indent=2)}")
         
-        # 별도의 debug_payload.log 에도 기록 (MAINTENANCE.md 가이드 준수)
-        with open("debug_payload.log", "a", encoding="utf-8") as f:
+        # 별도의 debug_payload.log 에도 기록 (logs 폴더 내부로 이동하여 Docker 볼륨 충돌 방지)
+        debug_log = os.path.join(self.log_dir, "debug_payload.log")
+        with open(debug_log, "a", encoding="utf-8") as f:
             f.write(f"\n--- [{datetime.now().isoformat()}] [{backend}] ---\n")
             f.write(payload)
             f.write("\n" + "="*50 + "\n")

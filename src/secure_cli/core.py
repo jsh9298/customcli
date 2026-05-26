@@ -757,12 +757,19 @@ class UnifiedSecureCLI:
             self.ui.print_info(f"Conversation history rewound to step {idx}.")
 
     async def chat_cycle(self, user_input):
-        # [Feature] Automatic @file reference parsing (improved regex for spaces)
-        file_refs = re.findall(r'@("([^"]+)"|([^\s]+))', user_input)
+        # [Feature] Automatic @file reference parsing (improved regex for spaces and existence check)
+        # 1. Matches quoted paths: @"path with space.md"
+        # 2. Matches unquoted paths: @path/to/file (until space/newline)
+        file_refs = re.findall(r'@(?:\"([^\"]+)\"|([^\s\n]+))', user_input)
         injected_content = ""
-        for full_match, quoted, unquoted in file_refs:
+        for quoted, unquoted in file_refs:
             path = quoted if quoted else unquoted
+            
+            # [Heuristic] If unquoted path exists as is, use it.
+            # If not, but it looks like a prefix of a file with spaces (requires disk check)
+            # For now, we prioritize quoted strings for complex paths.
             content = await self.read_file(path)
+            
             if not content.startswith("Error") and not content.startswith("Blocked"):
                 masked_file_content = self.protector.mask(content)
                 injected_content += f"\n\n--- Reference File: {path} ---\n{masked_file_content}\n"
@@ -781,6 +788,11 @@ class UnifiedSecureCLI:
                 try:
                     response, usage = await self.backend.chat(masked_input)
                 except Exception as e:
+                    if "429" in str(e) or "Quota" in str(e):
+                        self.ui.print_error("\n[Quota Error] Google AI API 일일 할당량을 초과했습니다 (Free Tier 제한).")
+                        self.ui.print_info("잠시 후 다시 시도하거나, 다른 API 키를 사용하십시오.")
+                        return
+                    
                     self.ui.print_warning(f"Connection lost, retrying... ({e})")
                     await self.backend.initialize()
                     response, usage = await self.backend.chat(masked_input)

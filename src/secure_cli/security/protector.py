@@ -17,6 +17,7 @@ class SecurityProtector:
         self._mask_map: Dict[str, str] = {}
         self._unmask_map: Dict[str, str] = {}
         self.patterns: Dict[str, str] = {}
+        self.normalization_rules: List[str] = []
         self.guardrails: List[str] = []
         self.whitelist: List[str] = []
         self.mask_cache: Dict[str, str] = {} # Content hash -> Masked text
@@ -30,9 +31,15 @@ class SecurityProtector:
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = yaml.safe_load(f) or {}
                     self.patterns = config.get('patterns', {})
+                    self.normalization_rules = config.get('normalization_rules', [])
                     self.guardrails = config.get('guardrails', [])
                     self.whitelist = config.get('whitelist', [])
-                    self.logger.info(f"Loaded {len(self.patterns)} patterns, {len(self.guardrails)} guardrails, and {len(self.whitelist)} whitelist items.")
+                    
+                    # Fallback if patterns are missing
+                    if not self.patterns:
+                        self.patterns = config.get('defaults', {})
+                        
+                    self.logger.info(f"Loaded {len(self.patterns)} patterns, {len(self.normalization_rules)} normalization rules.")
             except Exception as e:
                 self.logger.error(f"Config load error: {e}")
                 self._set_default_patterns()
@@ -40,11 +47,10 @@ class SecurityProtector:
             self._set_default_patterns()
 
     def _set_default_patterns(self):
-        self.patterns = {
-            'EMAIL': r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+',
-            'API_KEY': r'AIzaSy[A-Za-z0-9_-]{33}',
-            'IPV4': r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
-        }
+        """설정 파일 로드 실패 시 적용할 기본 동작 (하드코딩 배제)"""
+        self.patterns = {}
+        self.normalization_rules = []
+        self.logger.warning("No masking patterns loaded. System is running without DLP protection.")
 
     def mask(self, text: str, is_response: bool = False) -> str:
         """
@@ -80,8 +86,14 @@ class SecurityProtector:
                 return self._mask_map[val]
             
             label = match.lastgroup
+            
+            # [Token Consistency] 설정된 규칙에 따라 정규화된 값을 기반으로 해시 생성
+            norm_val = val
+            if label in self.normalization_rules:
+                norm_val = re.sub(r'[- ]', '', val)
+
             # [Truncated SHA-256] 데이터 기반 고유 8글자 해시 생성
-            val_hash = hashlib.sha256(val.encode()).hexdigest()[:8]
+            val_hash = hashlib.sha256(norm_val.encode()).hexdigest()[:8]
             token = f"[{label}_{val_hash}]"
             
             self._mask_map[val] = token

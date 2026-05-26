@@ -1,4 +1,4 @@
-# 🛡️ Humble Custom AI Workstation (v1.8.5)
+# 🛡️ Humble Custom AI Workstation (v1.8.6)
 
 > **Built 100% with Vibe Coding via Gemini CLI (Free Tier)**
 > 
@@ -6,10 +6,12 @@
 
 ---
 
-## 🚀 Key Features (v1.8.5)
+## 🚀 Key Features (v1.8.6)
 
 ### 🔐 Advanced DLP Engine (Core)
-*   **Pure Local Security**: 민감 정보(이메일, 카드번호, API 키 등)를 로컬에서 즉시 마스킹.
+*   **Pure Local Security**: 민감 정보(주민번호, 이메일, 카드번호, API 키 등)를 로컬에서 즉시 마스킹.
+*   **Configuration-Driven Architecture**: 소스 코드 내 하드코딩을 완전히 제거하고, 모든 보안 패턴과 정규화 규칙을 `masking_config.yaml`에서 관리합니다.
+*   **Token Consistency & Normalization**: 동일한 정보라면 포맷(하이픈, 공백 유무)이 달라도 항상 일관된 토큰으로 변환하여 AI의 문맥 이해도를 높입니다.
 *   **Security Audit Logging**: AI로 전송되는 모든 데이터는 마스킹 완료 후 `logs/security_audit.log` 및 `logs/debug_payload.log`에 안전하게 기록됩니다.
 *   **Response Firewall**: AI의 답변 속에 포함된 잠재적 민감 정보까지 실시간 필터링.
 

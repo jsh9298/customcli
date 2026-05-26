@@ -20,16 +20,15 @@ from rich.markdown import Markdown
 from rich.live import Live
 from rich.table import Table
 from rich.panel import Panel
-from prompt_toolkit import PromptSession
+from prompt_toolkit import PromptSession, prompt
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import Condition
-from prompt_toolkit.application import get_app
+from prompt_toolkit.application import get_app, run_in_terminal
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.styles import Style
-from prompt_toolkit.shortcuts import run_in_terminal
 
 # Tiered Package Components
 from secure_cli.security.protector import SecurityProtector
@@ -622,12 +621,9 @@ class UnifiedSecureCLI:
 
     async def cmd_inline(self, ctx, *args):
         """Execute a one-shot command without breaking conversation flow (Ctrl+I)."""
-        async def _get_input():
-            return await self.inline_session.prompt_async("Inline Command: ")
-            
-        # [Critical Fix] Use run_in_terminal to avoid "Application is already running" crash
-        # when triggered from a keybinding while the main app is active.
-        cmd = await run_in_terminal(_get_input)
+        # [Critical Fix] Use synchronous prompt within run_in_terminal
+        # and apply the same TUI style for consistency.
+        cmd = await run_in_terminal(lambda: prompt("Inline Command: ", style=self.tui_style))
         
         if cmd and cmd.strip():
             cmd = cmd.strip()

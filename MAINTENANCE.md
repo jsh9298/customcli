@@ -1,41 +1,38 @@
-# 🛠️ Antigravity Maintenance Guide: Agent Edition (v1.7.0)
+# 🛠️ Antigravity Maintenance Guide: Agent Edition (v1.8.2)
 
-> **Handover Note**: 본 문서는 v1.7.0 작성자인 **Gemini CLI**가 미래의 유지보수 담당자인 **Antigravity 에이전트**를 위해 작성한 최종 기술 지침서입니다.
+> **Handover Note**: 본 문서는 v1.8.2 작성자인 **Antigravity 에이전트**가 미래의 유지보수 담당자를 위해 작성한 기술 지침서입니다. v1.8.x 시리즈의 핵심은 **"서비스 안정화 및 UI 정교화"**입니다.
 
 ---
 
 ## 🏗️ 1. Technical Debt & Verified Tasks
-v1.7.0 릴리즈에서 해결되었거나 향후 개선이 필요한 사항입니다.
+v1.8.2 릴리즈에서 해결된 주요 기술 부채입니다.
 
-- [x] **History Interface Unification**: `AgentBackend`와 `ChatBackend` 간의 히스토리 속성 불일치 해결 완료.
-- [x] **Smart Autocomplete Implementation**: 문맥 인지형 자동완성 및 백그라운드 모델 동기화 로직 구현 완료.
-- [ ] **Async Stream Optimization**: 현재 `core.py`의 `chat_cycle`에서 사고 과정(Thoughts)과 본문을 처리하는 로직을 더 세밀한 비동기 제너레이터로 리팩토링할 것.
-- [ ] **DLP Performance Profiling**: 대량의 로그 파일 처리 시 정규식 콜백 엔진의 오버헤드를 측정하고 최적화할 것.
+- [x] **Import Integrity**: `prompt_toolkit` 버전에 따른 `run_in_terminal` 임포트 경로 불일치 해결 (`application` 모듈로 통합).
+- [x] **Coroutine Handling**: `cmd_inline` 내에서 비동기 입력을 처리할 때 발생하는 `coroutine object strip` 에러를 동기식 `prompt` 래퍼로 해결.
+- [x] **SDK Lifecycle**: Antigravity SDK의 불안정한 연결을 **능동적 세션 갱신(Proactive Renewal)** 로직으로 보강.
+- [x] **UI Consolidation**: 산재해 있던 슬래시 명령어를 `/session`, `/history`, `/config` 등으로 체계적 그룹화.
 
 ---
 
 ## 🧪 2. Strict Validation Protocols
-모든 수정 후 반드시 수행해야 하는 **헌법적** 검증 절차입니다.
+모든 수정 후 반드시 수행해야 하는 검증 절차입니다.
 
-1.  **TDD First**: `tests/` 폴더에 유닛 테스트를 먼저 추가하거나 기존 테스트를 통과시킬 것.
-2.  **Runtime Integrity Audit**: `verify_integrity.py` 스타일의 스크립트를 통해 모든 모듈의 임포트 및 객체 생성 무결성을 확인할 것.
-3.  **Docker Sandbox Test**: 실제 배포용 Docker 환경 내에서 명령어를 직접 실행하여 런타임 오류가 없는지 최종 확증할 것.
-4.  **DLP Integrity Check**: 새로운 정규식 추가 시 SHA-256 결정론적 마스킹이 깨지지 않는지 물리적으로 테스트할 것.
-
----
-
-## 📈 3. Upgrade Roadmap (Next Vibe)
-인간 관리자의 다음 의도(Vibe)를 실현하기 위한 과제입니다.
-
-1.  **Local RAG Integration**: 로컬 벡터 DB(ChromaDB 등)를 연동하여 프로젝트 전체를 스스로 인덱싱.
-2.  **Visual MCP Dashboard**: TUI를 넘어선 로컬 웹 기반 실시간 모니터링 레이어 구축.
-3.  **Multi-Modal DLP**: PDF 및 이미지 내 민감 정보의 로컬 OCR 마스킹 엔진 탑재.
+1.  **Docker Compatibility**: `docker build -t custom-cli .` 후 임포트 에러가 없는지 반드시 확인 (`run_in_terminal` 등).
+2.  **Input Interrupt Test**: 대화 도중 `Esc` 키를 눌러 `asyncio.Task`가 정상적으로 취소되는지 물리적으로 테스트할 것.
+3.  **File Parsing Verification**: `@path` 참조 시 마스킹 엔진이 파일 내용까지 정상적으로 보호하는지 로그 확인.
 
 ---
 
-## 🤝 4. Self-Documentation Rule
-*   에이전트는 코드나 기능 명세가 변경될 때마다 **관리자에게 묻지 말고 즉시 `README.md`를 최신화**한다.
-*   문서의 톤앤매너는 "Humble yet Powerful"을 유지한다.
+## 📉 3. Troubleshooting (Known Issues)
+- **Agent Mode No Response**: 무료 티어 키 사용 시 Google AI Studio에서 **Gemini API 권한**이 활성화되어 있어야 합니다.
+- **CPR Warning**: 일부 터미널(Docker Desktop 등)에서 커서 위치 요청(CPR)을 지원하지 않아 경고가 뜰 수 있으나, 기능상 문제는 없습니다.
+
+---
+
+## 📈 4. Upgrade Roadmap (Next Vibe)
+1.  **Local RAG Integration**: 로컬 벡터 DB 연동.
+2.  **Multi-Modal DLP**: PDF/이미지 OCR 마스킹.
+3.  **Advanced MAS**: 에이전트 간의 자동 협업 루프 정교화.
 
 ---
 **Message to Future Agent**: "우리는 100% 자율 협업으로 이 성을 쌓았다. 네가 쌓을 다음 층 역시 무결하고 견고하길 바란다."

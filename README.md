@@ -1,4 +1,4 @@
-# 🛡️ Humble Custom AI Workstation (v1.7.5)
+# 🛡️ Humble Custom AI Workstation (v1.8.2)
 
 > **Built 100% with Vibe Coding via Gemini CLI (Free Tier)**
 > 
@@ -6,7 +6,7 @@
 
 ---
 
-## 🚀 Key Features (v1.7.5)
+## 🚀 Key Features (v1.8.2)
 
 ### 🔐 Advanced DLP Engine (Core)
 *   **Pure Local Security**: 민감 정보(이메일, 카드번호, API 키 등)를 로컬에서 즉시 마스킹.
@@ -16,7 +16,16 @@
 ### 🤖 Intelligent Agentic Control
 *   **Consolidated Commands**: 유사 기능을 통합하여 사용자 편의성 극대화.
 *   **Korean-Enhanced Autocomplete**: 명령어 입력 시 한글 설명이 포함된 지능형 자동완성 지원.
-*   **SDK Auto-Recovery**: Antigravity SDK 연결 오류 시 자동으로 세션을 복구하는 Retry 로직 탑재.
+*   **SDK Auto-Recovery**: Antigravity SDK 연결 오류 시 자동으로 세션을 복구하는 **능동적 생명주기 관리** 탑재.
+*   **@File Analysis**: 질문 시 `@path/to/file`을 포함하면 자동으로 해당 파일 내용을 읽어 분석에 활용.
+
+---
+
+## 🛠️ Stability Improvements (v1.8.x)
+
+- **[Fix] Import Error**: 일부 환경에서 `run_in_terminal` 임포트 경로가 어긋나던 문제를 `prompt_toolkit.application` 참조로 수정하여 Docker 환경 안정성 확보.
+- **[Fix] Inline Command Crash**: `Ctrl+I` 입력 시 코루틴 반환값 처리 오류로 발생하던 세션 크래시 해결.
+- **[Fix] UI Rendering**: 제공된 스크린샷 기반으로 하단 6개 컬럼 대시보드 및 정렬된 자동완성 TUI 구현 완료.
 
 ---
 
@@ -36,22 +45,13 @@
 
 ---
 
-## 🛠️ Working Modes
-
-`Shift + Tab`을 통해 실시간으로 전환 가능합니다.
-
-1.  **Default Mode**: 자유롭게 대화하며 도구 사용 시 매번 사용자의 승인을 받습니다.
-2.  **Auto-Edit Mode**: 에이전트가 코드를 직접 수정할 수 있는 권한이 부여됩니다.
-3.  **Plan Mode**: **강력한 읽기 전용 모드**. 시스템 변경 시도를 코드 레벨에서 차단합니다.
-
----
-
 ## ⌨️ Productivity Shortcuts
 
 | Shortcut | Action |
 | :--- | :--- |
 | `Shift + Tab` | **Work Mode Cycle** (Default -> Auto-Edit -> Plan) |
 | `Tab + Tab` | **UI Density Toggle** (Full <-> Minimal) |
+| `Esc` | **Abort Current Request** (작업 중단) |
 | `Esc + Esc` | **Visual Rewind UI** 호출 (과거 시점으로 롤백) |
 | `Ctrl + Y` | **Autonomy Toggle** (Always Approve 모드 전환) |
 | `Ctrl + I` | **Inline Command**: 원샷 명령 창 호출 |
@@ -59,18 +59,29 @@
 
 ---
 
-## 💡 Best Practices
+## 🛠️ Installation & Setup (Docker Recommended)
 
-1.  **Context Pinning**: 중요한 아키텍처 설명은 `/history pin <index>`를 사용하여 압축 대상에서 영구 제외하십시오.
-2.  **@파일 참조**: 질문 시 `@src/core.py`와 같이 입력하면 해당 파일 내용이 자동으로 보안 마스킹 후 지식 베이스에 주입됩니다.
-3.  **Smart Suggestion**: 명령어 입력 후 `Tab` 키를 활용하여 모델 이름이나 세션 파일명을 한글 설명을 보며 선택하십시오.
+```bash
+# Docker Build
+docker build -t custom-cli .
+
+# Docker Run (Workspace mount recommended)
+docker run -it --rm --env-file .env -v $(pwd):/app/workspace custom-cli
+```
+
+---
+
+## 📉 Troubleshooting
+
+### 에이전트 모드 답변이 안 나오는 경우
+*   사용 중인 **Google API Key**의 해당 프로젝트에서 **Gemini API 권한**이 활성화되어 있는지 확인하십시오.
+*   `Agent` 모드는 단순 Chat보다 높은 수준의 권한을 요구하므로, API 대시보드에서 할당량(Quota)을 점검하십시오.
 
 ---
 
 ## 🤖 Authorship & Maintenance Notice
 
 *   **Written by**: **Gemini CLI** (100% Autonomous Authoring)
-*   **Vibe Orchestrator**: [Your Name/Handle]
 *   **Maintenance Policy**: "에이전트가 만들었으니, 에이전트가 고친다." 
 
 ---

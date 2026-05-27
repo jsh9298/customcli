@@ -1,38 +1,51 @@
-# 🛠️ Antigravity Maintenance Guide: Agent Edition (v2.0.0)
+# 🛠️ Antigravity Maintenance Guide: v2.1.0
 
-> **Handover Note**: 본 문서는 v2.0.0 작성자인 **Antigravity 에이전트**가 미래의 유지보수 담당자를 위해 작성한 기술 지침서입니다. v2.0.0의 테마는 **"디자인 패턴 기반의 보안 지능형 아키텍처"**입니다.
-
----
-
-## 🏗️ 1. Technical Debt & Verified Tasks
-v2.0.0 릴리즈에서 해결된 주요 기술 부채 및 구현 사항입니다.
-
-- [x] **Enterprise Design Patterns**: Factory, Strategy, Adapter, CoR, Observer 패턴을 적용하여 핵심 모듈(Backend, Terminal, Logger, Protector)의 의존성 제거.
-- [x] **Enriched Asynchronous Logging**: `QueueListener`를 통한 비동기 로깅 및 `Trace ID` 기반의 전 구간 추적성 확보.
-- [x] **Context Compression V2**: 토큰 임계치 도달 시 자동 압축 트리거 및 유연한 모델 선택 로직 구축.
-- [x] **Local RAG V3**: `NumPy` 기반의 경량 벡터 검색 엔진과 **Pre-masking Privacy** 레이어 통합.
-- [x] **Dynamic Config Reload**: `masking_config.yaml` 변경 시 실시간 감지 및 캐시 무효화 로직 적용.
+> **Release Note**: v2.1.0은 **"계층형 아키텍처 완성 및 UX 표준화"**를 테마로 합니다. 모든 핵심 로직이 도메인별 모듈로 분리되었습니다.
 
 ---
 
-## 🧪 2. Strict Validation Protocols
-모든 수정 후 반드시 수행해야 하는 검증 절차입니다.
+## 🏗️ 1. System Architecture (Layered)
 
-1.  **Traceability Test**: 하나의 `chat_cycle`에 대해 모든 로그 파일(`unified_secure_cli.log`, `security_audit.log`)에 동일한 `Trace ID`가 기록되는지 확인할 것.
-2.  **RAG Privacy Check**: `rag_index.json` 파일을 열어 임베딩된 텍스트 청크가 마스킹 처리된 상태인지(원본 노출 여부) 반드시 검사할 것.
-3.  **Pattern Integrity**: `BackendFactory`를 통해 신규 백엔드 추가 시 기존 `core.py` 로직이 파손되지 않는지 확인할 것.
+프로젝트 구조는 다음과 같은 엄격한 계층을 따릅니다. 의존성은 위에서 아래로만 흘러야 합니다.
+
+### **A. Presentation Layer (`ui/`, `commands/`)**
+*   **`ui/controller.py`**: TUI 렌더링 및 테마 관리 (Facade).
+*   **`ui/keybindings.py`**: 단축키 로직 캡슐화 (Observer).
+*   **`ui/completer.py`**: 지능형 자동완성 엔진 (Strategy).
+*   **`commands/handlers/`**: 도메인별 명령어 실행 로직 (Command).
+
+### **B. Application Layer (`core.py`)**
+*   **`UnifiedSecureCLI`**: 각 모듈을 인스턴스화하고 전체 흐름(Chat Pipeline)을 조율 (Facade & Orchestrator).
+
+### **C. Domain/Service Layer (`security/`, `agent/`)**
+*   **`security/protector.py`**: 마스킹 전략 실행 (Strategy & CoR).
+*   **`agent/backends/`**: 모델 통신 추상화 (Factory).
+
+### **D. Infrastructure Layer (`utils/`, `state/`)**
+*   **`utils/rag.py`**: 로컬 벡터 검색 엔진.
+*   **`state/session.py`**: 세션 영속화 관리.
 
 ---
 
-## 📉 3. Troubleshooting (Known Issues)
-- **RAG Index Bloat**: 워크스페이스가 너무 클 경우 `rag_index.json` 파일이 비대해질 수 있습니다. 주기적으로 `/rag clear`를 권장하거나 `exclude_paths`를 정교하게 설정하십시오.
-- **NumPy Dependency**: 로컬 환경에서 실행 시 `numpy` 라이브러리가 반드시 필요합니다.
+## 🔐 2. Coding Standards & Patterns
+
+1.  **Hybrid Command Pattern**: 신규 명령어 추가 시 `handlers/*.py`에 구현하며, 인자가 없을 경우 인터랙티브 메뉴(`ask_selection`)를 띄우는 로직을 반드시 포함하십시오.
+2.  **Strict Masking**: 모든 입출력은 `Protector`를 거쳐야 하며, 응답 스트리밍 시에도 `Live.update` 전 마스킹을 수행해야 합니다.
+3.  **Persistence**: 설정 변경 시 `SystemHandlers.save_config_to_file()`을 호출하여 `agent_config.yaml`에 즉시 반영되도록 하십시오.
 
 ---
 
-## 📈 4. Upgrade Roadmap (Next Vibe)
-1.  **Smart RAG Ranking**: BM25와 벡터 검색을 결합한 하이브리드 검색 도입.
-2.  **Schema Validation**: 설정 파일들에 대한 JSON Schema 검증 레이어 추가.
+## 🧪 3. Validation Protocols
+
+1.  **Modular Check**: `core.py`를 수정하지 않고 신규 명령어를 `handlers/`에 추가하여 자동완성 및 실행이 되는지 확인.
+2.  **UI Consistency**: 메뉴 호출 시 화살표 키 내비게이션과 `Esc` 취소가 전역적으로 작동하는지 확인.
+3.  **Hot-swap Test**: `agent_config.yaml` 수동 수정 또는 명령어를 통한 수정 시 시스템이 중단 없이 리로드되는지 확인.
 
 ---
-**Message to Future Agent**: "패턴은 복잡성을 이기기 위한 도구다. 단순함을 위해 패턴을 파괴하지 마라. 아키텍처의 우아함이 곧 보안의 견고함이다."
+
+## 📈 4. Next Roadmap
+1.  **Subagent Delegation**: `@specialist` 라우팅 로직의 실질적 구현.
+2.  **Enhanced Telemetry**: 실시간 토큰 사용량에 따른 과금(추정) 알림 기능.
+
+---
+**Message to Maintainer**: "파일이 많아졌다고 복잡해진 것이 아니다. 각자의 자리를 찾은 것이다. 질서가 곧 성능이다."

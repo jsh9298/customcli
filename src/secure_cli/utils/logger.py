@@ -133,6 +133,12 @@ class SecureLogger:
             f.write(payload)
             f.write("\n" + "="*50 + "\n")
 
+    def stop(self):
+        """Gracefully shuts down the logging listener."""
+        if hasattr(self, 'listener'):
+            self.listener.stop()
+        self._initialized = False
+
 # Simple mapping for PayloadLogger replacement
 class PayloadLogger(SecureLogger):
     """Maintain backward compatibility for existing imports."""

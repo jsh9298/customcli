@@ -1,79 +1,81 @@
-# 🛡️ Humble Custom AI Workstation (v2.0.0)
+# 🛡️ Secure AI Workstation (v2.1.0)
 
-> **Built 100% with Vibe Coding via Gemini CLI (Free Tier)**
->  6/18 죽을 예정인 Gemini CLI 죽기전까지 굴려먹기
-> 본 프로젝트는 어떠한 수동 코딩 없이, 오직 Gemini CLI의 무료 티어 한도 내에서 AI와의 대화(Vibe Coding)만으로 설계, 구현, 검증된 엔터프라이즈급 보안 AI 에이전트 워크스테이션입니다.
+본 프로젝트는 보안이 강화된 엔터프라이즈급 AI 개발 워크스테이션입니다. Google Antigravity(`agy`)의 강력한 에이전트 능력과 Gemini CLI의 친숙한 사용자 경험을 결합하여, 로컬 데이터를 안전하게 보호하면서 AI의 도움을 받을 수 있는 최적의 환경을 제공합니다.
 
 ---
 
-## 🚀 Key Features (v2.0.0)
+## ✨ 핵심 기능 상세
 
-### 🧠 Local RAG V3 (Intelligence) - **New**
-*   **Privacy-First Search**: 임베딩 전 **선제적 마스킹(Pre-masking)**을 통해 민감 정보 유출 없이 클라우드 임베딩 활용.
-*   **Lightweight Engine**: `NumPy` 기반의 벡터 연산으로 별도의 DB 서버 없이 수천 개의 문서를 실시간 검색.
-*   **Incremental Indexing**: 파일 변경 사항만 감지하여 효율적으로 색인 업데이트.
+### 🔍 1. Privacy-First Local RAG (지식 베이스)
+*   **작동 방식**: 내 프로젝트의 코드나 문서를 색인하여 AI가 문맥을 파악하게 합니다.
+*   **보안 특점**: 외부 서버(임베딩 API)로 데이터를 보내기 전, **로컬에서 먼저 마스킹**을 수행하여 민감 정보 유출을 원천 차단합니다.
+*   **증분 업데이트**: 파일의 수정 시간(`mtime`)을 추적하여 변경된 파일만 효율적으로 다시 색인합니다.
 
-### 🔐 Pattern-Driven Security (Architecture)
-*   **Design Patterns**: Factory, Strategy, Adapter, CoR, Observer 패턴이 적용되어 모듈성과 확장성이 극대화되었습니다.
-*   **Enriched Logging**: 비동기 큐 기반 로깅, `Trace ID` 전파, 계층적 레벨링 적용.
-*   **Context Compression V2**: 자동 압축 트리거 및 유연한 요약 모델 선택 기능.
-*   **Dynamic Reloading**: `masking_config.yaml` 변경 사항의 실시간 무중단 반영.
+### 🔐 2. 실시간 로컬 DLP (데이터 보호)
+*   **입력 마스킹**: AI에게 질문을 던지기 전 이메일, 카드번호, API 키 등을 자동으로 감지하여 가명화합니다.
+*   **응답 정화**: AI의 답변 속에 포함될 수 있는 민감한 코드나 데이터도 사용자에게 보여주기 전 한 번 더 검사합니다.
 
-### 🤖 Intelligent Agentic Control
-*   **Aligned Autocomplete**: 명령어와 설명을 시각적으로 깔끔하게 정렬한 자동완성 메뉴를 제공합니다.
-*   **Robust @File Parsing**: 질문 시 `@path/to/file` 분석 지원.
+### 🎭 3. 듀얼 모드 워크스테이션
+*   **Agents 모드**: 자율적인 태스크 수행, 복잡한 도구(MCP) 연동, 미션 목표 달성에 최적화.
+*   **Chat 모드**: 가벼운 질의응답, 세션 관리, 히스토리 롤백 등에 최적화.
 
 ---
 
-## ⌨️ Consolidated Commands (Main)
+## ⌨️ 명령어 상세 가이드 (Command Reference)
 
-| Command | Description | Sub-commands / Options |
+모든 명령어는 **하이브리드 패턴**을 지원합니다. 인자 없이 입력하면 가이드 메뉴가 나타납니다.
+
+| 명령어 | 사용 예시 | 상세 설명 |
 | :--- | :--- | :--- |
-| `/rag` | **로컬 RAG 관리** | `scan`, `status`, `clear` |
-| `/compress`| **컨텍스트 압축** | 수동 압축 실행 (V2 자동화 포함) |
-| `/session` | **세션 관리** | `save`, `load`, `list`, `resume`, `fork` |
-| `/history` | **대화 기록 관리** | `show`, `undo`, `rewind`, `pin`, `unpin` |
-| `/config` | **설정 및 환경 관리** | `show`, `model`, `agent`, `mode`, `autonomy`, `efficient`, `sandbox` |
-| `/usage` | **토큰 사용량 확인** | `session`, `total` |
-| `/utility` | **유틸리티 기능** | `file`, `export`, `peek`, `preview`, `copy`, `clear` |
-| `/goal` | **목표 및 태스크 관리** | `set`, `status` |
-| `/protect` | **보안 패턴 관리** | `add`, `remove` |
-| `/skills` | **스킬 관리** | `list`, `load`, `save` |
-| `/inline` | **인라인 명령** | 원샷 명령 실행 (Ctrl+I) |
+| **`/mode`** | `/mode chat` | Gemini(대화) 스타일과 Antigravity(에이전트) 스타일 간 전환 |
+| **`/settings`** | `/settings` | 모델명, 온도, 샌드박스 등 **영구 설정**을 변경하는 UI 진입 |
+| **`/rag`** | `/rag scan` | 워크스페이스 파일을 분석하여 지식 베이스 구축 및 브라우징 |
+| **`/skills`** | `/skills load py_expert` | 저장된 AI 스킬(지침 세트)을 로드하거나 현재 대화를 스킬로 저장 |
+| **`/chat`** | `/chat save my_project` | 현재 대화 상태와 마스킹 맵을 파일로 저장하거나 리스트 확인 |
+| **`/undo`** | `/undo` | 대화 내역을 단계별로 확인하고 특정 시점으로 즉시 롤백 |
+| **`/goal`** | `/goal "Refactor UI"` | 에이전트의 현재 미션 목표를 설정하고 단계별 진행 상황 확인 |
+| **`/theme`** | `/theme hacker` | 터미널 색상 테마 변경 (`neon`, `hacker`, `classic`) |
+| **`/inline`** | `Ctrl+I` | 대화 도중 흐름을 깨지 않고 별도의 창에서 한 발 명령어 실행 |
+
+### 💡 팁: 파일 참조 기능 (`@`)
+대화 중 `@파일명`을 입력하면 해당 파일의 내용이 자동으로 마스킹되어 질문에 포함됩니다.
+*   예: `이 코드의 버그를 찾아줘 @src/core.py`
+*   공백 포함 시: `이 문서를 요약해줘 @"docs/manual v2.md"`
 
 ---
 
-## 🛠️ Installation & Setup (Docker Recommended)
+## 🚀 빠른 시작 가이드 (Installation)
 
+### 1. 환경 설정
+프로젝트 루트에 `.env` 파일을 생성하고 API 키를 입력합니다.
+```env
+GEMINI_API_KEY=your_api_key_here
+```
+
+### 2. 실행 (Docker 권장)
+별도의 환경 구축 없이 도커를 통해 즉시 실행할 수 있습니다.
 ```bash
-# Docker Build
-docker build -t custom-cli .
+# 빌드
+docker build -t secure-cli .
 
-# Docker Run (Workspace & Persistence mount recommended)
+# 실행 (로그 및 설정 유지를 위해 볼륨 마운트 권장)
 docker run -it --rm --env-file .env \
   -v $(pwd):/app/workspace \
-  -v $(pwd)/.antigravity:/app/.antigravity \
   -v $(pwd)/logs:/app/logs \
-  custom-cli
+  secure-cli
 ```
 
 ---
 
-## 📉 Troubleshooting
-
-### RAG 검색 결과가 나오지 않는 경우
-*   `/rag scan` 명령어를 통해 워크스페이스를 먼저 색인했는지 확인하십시오.
-*   `agent_config.yaml`에서 `rag.enabled`가 `true`인지 확인하십시오.
-*   `numpy` 라이브러리가 정상 설치되었는지 확인하십시오.
-
----
-
-## 🤖 Authorship & Maintenance Notice
-
-*   **Written by**: **Gemini CLI** (100% Autonomous Authoring)
-*   **Maintenance Policy**: "에이전트가 만들었으니, 에이전트가 고친다." 
+## 🧪 시스템 무결성 점검 (Self-Check)
+워크스테이션은 실행 시 다음 사항을 자동으로 점검합니다.
+*   `agent_config.yaml` 파일 존재 여부 및 문법 확인
+*   필요한 Python 라이브러리(`rich`, `prompt_toolkit`, `yaml` 등) 로드 상태
+*   로컬 로그 디렉토리 권한
 
 ---
 
-## 📜 License
-본 프로젝트는 MIT 라이선스에 따라 자유롭게 사용, 수정, 배포할 수 있습니다.
+## 🤖 저작권 및 유지보수
+*   **Version**: v2.1.0 (Enterprise Modular Edition)
+*   **Maintainer**: Gemini CLI (Autonomous Authoring)
+*   **License**: MIT

@@ -3,7 +3,9 @@ import asyncio
 import time
 from google.antigravity import Agent, LocalAgentConfig, CapabilitiesConfig
 from google.antigravity.hooks import policy
-from typing import Any, List, Optional, Callable, Dict
+from google import genai
+import os
+from typing import Any, List, Optional, Callable, Dict, AsyncGenerator
 
 # [Bridge] Global reference to avoid deepcopy issues with bound methods
 _ask_user_handler_bridge: Optional[Callable] = None
@@ -21,6 +23,7 @@ class AgentBackend:
         self.prompt = prompt
         self.ask_user_handler = ask_user_handler
         self.agent = None
+        self.client = None # Utility client for embeddings/RAG
         self.history: List[Dict[str, Any]] = []
         self._last_active = 0
         self._connection_timeout = 600  # 10분 (연결 유지 시간 확장)
@@ -30,6 +33,10 @@ class AgentBackend:
         """세션을 초기화하고 타임아웃 설정을 대폭 강화합니다."""
         global _ask_user_handler_bridge
         _ask_user_handler_bridge = self.ask_user_handler
+        
+        # Initialize utility client
+        api_key = os.getenv("GEMINI_API_KEY")
+        self.client = genai.Client(api_key=api_key)
         
         agent_params = self.config_data.get('agent', {})
         caps_data = self.config_data.get('capabilities', {})
@@ -89,11 +96,35 @@ class AgentBackend:
             self._last_active = time.time()
             return response, response.usage_metadata if hasattr(response, 'usage_metadata') else None
         except Exception as e:
-            logging.error(f"Chat stream error: {e}. Force reconnecting...")
+            logging.error(f"Chat error: {e}. Force reconnecting...")
             await self.initialize()
             response = await self.agent.chat(text)
             self._last_active = time.time()
             return response, response.usage_metadata if hasattr(response, 'usage_metadata') else None
+
+    async def chat_stream(self, text: str) -> AsyncGenerator[str, None]:
+        """Streaming chat interface for Agent mode."""
+        await self.ensure_connected()
+        self._last_active = time.time()
+        
+        try:
+            # Assuming antigravity Agent supports chat_stream
+            async for chunk in await self.agent.chat_stream(text):
+                yield chunk.text
+        except AttributeError:
+            # Fallback if chat_stream is not supported
+            logging.warning("Agent.chat_stream not supported, falling back to chat.")
+            response, _ = await self.chat(text)
+            if hasattr(response, 'text'):
+                yield response.text
+            else:
+                yield str(response)
+        except Exception as e:
+            logging.error(f"Chat stream error: {e}. Force reconnecting...")
+            await self.initialize()
+            # Try one more time with non-streaming fallback
+            response, _ = await self.chat(text)
+            yield response.text if hasattr(response, 'text') else str(response)
 
     async def close(self):
         if self.agent:
@@ -102,3 +133,4 @@ class AgentBackend:
             except: pass
             self.agent = None
             self._is_initialized = False
+        self.client = None

@@ -3,7 +3,8 @@ from google.genai import types
 import os
 import httpx
 import json
-from typing import List, Dict, Any
+import asyncio
+from typing import List, Dict, Any, AsyncGenerator
 
 class ChatBackend:
     """
@@ -44,32 +45,55 @@ class ChatBackend:
             self.model = self.config_data.get('agent', {}).get('model', "llama3")
             self.history = []
 
-    async def chat(self, text):
+    async def chat(self, text: str):
+        """[Deprecated] Non-streaming chat for compatibility."""
         if self.provider == 'google':
             response = await self.chat_session.send_message(text)
             return response, response.usage_metadata if hasattr(response, 'usage_metadata') else None
         else:
-            # OpenAI 호환 API 호출 로직
+            # Fallback to stream and collect
+            full_text = ""
+            async for chunk in self.chat_stream(text):
+                full_text += chunk
+            
+            class MockResponse:
+                def __init__(self, text): self.text = text
+            return MockResponse(full_text), None
+
+    async def chat_stream(self, text: str) -> AsyncGenerator[str, None]:
+        """Streaming chat interface for better UX."""
+        if self.provider == 'google':
+            async for chunk in await self.chat_session.send_message_stream(text):
+                if hasattr(chunk, 'text'):
+                    yield chunk.text
+                elif hasattr(chunk, 'candidates'):
+                    yield chunk.candidates[0].content.parts[0].text
+        else:
+            # OpenAI 호환 API 스트리밍 호출
             async with httpx.AsyncClient() as client:
                 messages = [{"role": "system", "content": self.prompt}] + self.history + [{"role": "user", "content": text}]
-                resp = await client.post(
+                async with client.stream(
+                    "POST",
                     f"{self.base_url}/chat/completions",
                     headers={"Authorization": f"Bearer {self.api_key}"},
                     json={
                         "model": self.model,
                         "messages": messages,
-                        "temperature": self.config_data.get('agent', {}).get('temperature', 0.7)
+                        "temperature": self.config_data.get('agent', {}).get('temperature', 0.7),
+                        "stream": True
                     },
                     timeout=60.0
-                )
-                data = resp.json()
-                content = data['choices'][0]['message']['content']
-                # [Note] core.py will also append to this history
-                
-                # Mock response object to maintain compatibility with core.py
-                class MockResponse:
-                    def __init__(self, text): self.text = text
-                return MockResponse(content), None
+                ) as response:
+                    async for line in response.aiter_lines():
+                        if line.startswith("data: "):
+                            data_str = line[6:].strip()
+                            if data_str == "[DONE]": break
+                            try:
+                                data = json.loads(data_str)
+                                delta = data['choices'][0]['delta']
+                                if 'content' in delta:
+                                    yield delta['content']
+                            except: continue
 
     async def close(self):
         self.client = None

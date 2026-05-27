@@ -56,13 +56,13 @@ GEMINI_API_KEY=your_api_key_here
 별도의 환경 구축 없이 도커를 통해 즉시 실행할 수 있습니다.
 ```bash
 # 빌드
-docker build -t secure-cli .
+docker build -t custom-cli .
 
 # 실행 (로그 및 설정 유지를 위해 볼륨 마운트 권장)
 docker run -it --rm --env-file .env \
   -v $(pwd):/app/workspace \
   -v $(pwd)/logs:/app/logs \
-  secure-cli
+  custom-cli
 ```
 
 ---

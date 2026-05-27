@@ -1,7 +1,7 @@
 # 🛡️ Humble Custom AI Workstation (v2.0.0)
 
 > **Built 100% with Vibe Coding via Gemini CLI (Free Tier)**
-> 
+>  6/18 죽을 예정인 Gemini CLI 죽기전까지 굴려먹기
 > 본 프로젝트는 어떠한 수동 코딩 없이, 오직 Gemini CLI의 무료 티어 한도 내에서 AI와의 대화(Vibe Coding)만으로 설계, 구현, 검증된 엔터프라이즈급 보안 AI 에이전트 워크스테이션입니다.
 
 ---

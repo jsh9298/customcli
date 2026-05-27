@@ -25,7 +25,7 @@ COPY src/ ./src/
 RUN pip install --no-cache-dir .
 
 # [Standard] 마운트 포인트 선언
-VOLUME ["/app/workspace", "/app/sessions", "/app/debug_payload.log"]
+VOLUME ["/app/workspace", "/app/sessions", "/app/.antigravity", "/app/logs"]
 
 # Set entry point to the installed script
 ENTRYPOINT ["custom-cli"]

@@ -1,4 +1,4 @@
-# 🛡️ Humble Custom AI Workstation (v1.8.6)
+# 🛡️ Humble Custom AI Workstation (v2.0.0)
 
 > **Built 100% with Vibe Coding via Gemini CLI (Free Tier)**
 > 
@@ -6,27 +6,22 @@
 
 ---
 
-## 🚀 Key Features (v1.8.6)
+## 🚀 Key Features (v2.0.0)
 
-### 🔐 Advanced DLP Engine (Core)
-*   **Pure Local Security**: 민감 정보(주민번호, 이메일, 카드번호, API 키 등)를 로컬에서 즉시 마스킹.
-*   **Configuration-Driven Architecture**: 소스 코드 내 하드코딩을 완전히 제거하고, 모든 보안 패턴과 정규화 규칙을 `masking_config.yaml`에서 관리합니다.
-*   **Token Consistency & Normalization**: 동일한 정보라면 포맷(하이픈, 공백 유무)이 달라도 항상 일관된 토큰으로 변환하여 AI의 문맥 이해도를 높입니다.
-*   **Security Audit Logging**: AI로 전송되는 모든 데이터는 마스킹 완료 후 `logs/security_audit.log` 및 `logs/debug_payload.log`에 안전하게 기록됩니다.
-*   **Response Firewall**: AI의 답변 속에 포함된 잠재적 민감 정보까지 실시간 필터링.
+### 🧠 Local RAG V3 (Intelligence) - **New**
+*   **Privacy-First Search**: 임베딩 전 **선제적 마스킹(Pre-masking)**을 통해 민감 정보 유출 없이 클라우드 임베딩 활용.
+*   **Lightweight Engine**: `NumPy` 기반의 벡터 연산으로 별도의 DB 서버 없이 수천 개의 문서를 실시간 검색.
+*   **Incremental Indexing**: 파일 변경 사항만 감지하여 효율적으로 색인 업데이트.
+
+### 🔐 Pattern-Driven Security (Architecture)
+*   **Design Patterns**: Factory, Strategy, Adapter, CoR, Observer 패턴이 적용되어 모듈성과 확장성이 극대화되었습니다.
+*   **Enriched Logging**: 비동기 큐 기반 로깅, `Trace ID` 전파, 계층적 레벨링 적용.
+*   **Context Compression V2**: 자동 압축 트리거 및 유연한 요약 모델 선택 기능.
+*   **Dynamic Reloading**: `masking_config.yaml` 변경 사항의 실시간 무중단 반영.
 
 ### 🤖 Intelligent Agentic Control
-*   **Aligned Autocomplete**: 명령어와 설명을 시각적으로 깔끔하게 정렬한 자동완성 메뉴를 제공합니다. (타이핑 중 자동 노출, Tab 키는 들여쓰기로 작동)
-*   **Robust @File Parsing**: 질문 시 `@path/to/file` 또는 공백이 포함된 경우 `@"path with spaces.md"` 형식을 지원하여 자동 분석을 수행합니다.
-*   **Quota-Aware Feedback**: API 할당량(HTTP 429) 초과 시 명확한 안내 메시지를 출력하여 상태를 보고합니다.
-
----
-
-## 🛠️ Stability Improvements (v1.8.x)
-
-- **[Fix] Quota Handling**: 에이전트 모드 응답 중단 원인이 할당량 초과(HTTP 429)일 경우, 이를 감지하여 사용자에게 명확히 알립니다.
-- **[Fix] Docker Volume Conflict**: 로그 파일이 Docker 볼륨 설정으로 인해 디렉토리로 생성되는 문제를 로그 디렉토리 격리 로직으로 완전 해결했습니다.
-- **[Fix] Input Session Conflict**: `cmd_inline` (Ctrl+I) 실행 시의 런타임 충돌을 표준 입력 브릿지 기술로 안정화했습니다.
+*   **Aligned Autocomplete**: 명령어와 설명을 시각적으로 깔끔하게 정렬한 자동완성 메뉴를 제공합니다.
+*   **Robust @File Parsing**: 질문 시 `@path/to/file` 분석 지원.
 
 ---
 
@@ -34,9 +29,11 @@
 
 | Command | Description | Sub-commands / Options |
 | :--- | :--- | :--- |
+| `/rag` | **로컬 RAG 관리** | `scan`, `status`, `clear` |
+| `/compress`| **컨텍스트 압축** | 수동 압축 실행 (V2 자동화 포함) |
 | `/session` | **세션 관리** | `save`, `load`, `list`, `resume`, `fork` |
-| `/history` | **대화 기록 관리** | `show`, `undo`, `rewind`, `compress`, `pin`, `unpin` |
-| `/config` | **설정 및 환경 관리** | `show`, `model`, `agent`, `mode`, `autonomy`, `efficient`, `sandbox`, `refresh` |
+| `/history` | **대화 기록 관리** | `show`, `undo`, `rewind`, `pin`, `unpin` |
+| `/config` | **설정 및 환경 관리** | `show`, `model`, `agent`, `mode`, `autonomy`, `efficient`, `sandbox` |
 | `/usage` | **토큰 사용량 확인** | `session`, `total` |
 | `/utility` | **유틸리티 기능** | `file`, `export`, `peek`, `preview`, `copy`, `clear` |
 | `/goal` | **목표 및 태스크 관리** | `set`, `status` |
@@ -52,18 +49,22 @@
 # Docker Build
 docker build -t custom-cli .
 
-# Docker Run (Workspace mount recommended)
-docker run -it --rm --env-file .env -v $(pwd):/app/workspace custom-cli
+# Docker Run (Workspace & Persistence mount recommended)
+docker run -it --rm --env-file .env \
+  -v $(pwd):/app/workspace \
+  -v $(pwd)/.antigravity:/app/.antigravity \
+  -v $(pwd)/logs:/app/logs \
+  custom-cli
 ```
 
 ---
 
 ## 📉 Troubleshooting
 
-### 에이전트 모드 답변이 안 나오는 경우
-*   사용 중인 **Google API Key**의 해당 프로젝트에서 **Gemini API 권한**이 활성화되어 있는지 확인하십시오.
-*   API 서버와의 통신 지연이 심할 경우 `AgentBackend`의 `stream_timeout` 설정을 확인하십시오.
-*   `logs/security_audit.log`를 통해 실제 데이터가 서버로 정상 송신되는지 확인할 수 있습니다.
+### RAG 검색 결과가 나오지 않는 경우
+*   `/rag scan` 명령어를 통해 워크스페이스를 먼저 색인했는지 확인하십시오.
+*   `agent_config.yaml`에서 `rag.enabled`가 `true`인지 확인하십시오.
+*   `numpy` 라이브러리가 정상 설치되었는지 확인하십시오.
 
 ---
 

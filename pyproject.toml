@@ -1,6 +1,6 @@
 [project]
 name = "custom-cli"
-version = "1.7.0"
+version = "2.0.0"
 description = "Humble Custom AI Workstation with Antigravity and GenAI support"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,6 +13,7 @@ dependencies = [
     "PyYAML",
     "python-dotenv",
     "httpx",
+    "numpy",
 ]
 
 [project.scripts]

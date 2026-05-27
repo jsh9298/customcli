@@ -42,10 +42,13 @@ from secure_cli.commands.registry import CommandRegistry
 from secure_cli.commands.plugins import PluginManager
 from secure_cli.agent.orchestrator import AgentOrchestrator
 from secure_cli.agent.group import GroupChatManager
+from secure_cli.agent.backends.factory import BackendFactory
 from secure_cli.utils.mcp import MCPManager
 from secure_cli.utils.compressor import ContextCompressor
 from secure_cli.utils.skills import SkillManager
 from secure_cli.utils.git import GitUtility
+from secure_cli.utils.terminal_adapter import LocalTerminalAdapter
+from secure_cli.utils.rag import LocalRAGEngine
 from secure_cli.utils.scheduler import TaskScheduler
 from secure_cli.utils.logger import PayloadLogger
 
@@ -53,10 +56,7 @@ from secure_cli.utils.logger import PayloadLogger
 from secure_cli.agent.backends.agent_backend import AgentBackend
 from secure_cli.agent.backends.chat_backend import ChatBackend
 
-# --- Global Config ---
-logging.basicConfig(filename='unified_secure_cli.log', level=logging.DEBUG)
-
-class SmartCompleter(Completer):
+# --- Smart Completer ---
     def __init__(self, cli):
         self.cli = cli
 
@@ -244,12 +244,21 @@ class UnifiedSecureCLI:
         self.protector = SecurityProtector()
         self.resolver = ConfigResolver()
         self.config = self.resolver.resolve_settings()
-        
+        # Wire state config
         state_cfg = self.config.get('state', {})
         self.session_manager = SessionManager(expiry_days=state_cfg.get('expiry_days', 7))
         self.mcp_manager = MCPManager(self.protector)
         self.ui = UIController()
-        self.payload_logger = PayloadLogger()
+        
+        # [Logging V2] Apply dynamic logging configuration
+        log_cfg = self.config.get('logging', {})
+        self.payload_logger = PayloadLogger(
+            log_dir=log_cfg.get('dir', 'logs'),
+            log_level=log_cfg.get('level', 'INFO')
+        )
+
+        # Log session start
+        self.payload_logger.info("SecureCLI session initialized", mode=initial_mode)
         
         agent_cfg = self.config.get('agent', {})
         self.telemetry = TelemetryManager(
@@ -257,21 +266,23 @@ class UnifiedSecureCLI:
             model_limit=agent_cfg.get('max_output_tokens', 4096)
         )
         
-        self.orchestrator = AgentOrchestrator(self)
-        self.sandbox = SandboxManager()
-        self.plugins = PluginManager(os.path.join(self.resolver.GLOBAL_ROOT, 'plugins'))
-        self.diff_viewer = DiffViewer(self.ui.console)
-        self.commands = CommandRegistry()
-        self.skill_manager = SkillManager(os.path.join(self.resolver.GLOBAL_ROOT, 'skills'))
-        self.git = GitUtility()
-        self.scheduler = TaskScheduler(self.chat_cycle)
-        self.group_chat = GroupChatManager(self)
-        
         self.cli_mode = initial_mode
         self.backend = None
         self.modes = ['default', 'auto-edit', 'plan']
         self.current_mode_idx = 0
         self.autonomy_level = "review"
+
+        self.orchestrator = AgentOrchestrator(self)
+        self.sandbox = SandboxManager()
+        self.terminal_adapter = LocalTerminalAdapter(self.sandbox, self.ui, self.autonomy_level)
+        self.plugins = PluginManager(os.path.join(self.resolver.GLOBAL_ROOT, 'plugins'))
+        self.diff_viewer = DiffViewer(self.ui.console)
+        self.commands = CommandRegistry()
+        self.skill_manager = SkillManager(os.path.join(self.resolver.GLOBAL_ROOT, 'skills'))
+        self.git = GitUtility()
+        self.rag_engine = LocalRAGEngine(self)
+        self.scheduler = TaskScheduler(self.chat_cycle)
+        self.group_chat = GroupChatManager(self)
         self.last_response = ""
         self.last_shell_output = ""
         self.efficient_mode = False
@@ -456,6 +467,7 @@ class UnifiedSecureCLI:
         self.commands.register('/logout', self.cmd_exit, "로그아웃", tags=['agents'])
 
         # System Utility
+        self.commands.register('/rag', self.cmd_rag, "로컬 RAG 관리", tags=['chat', 'agents'])
         self.commands.register('/utility', self.cmd_utility_unified, "유틸리티", tags=['chat', 'agents'])
         self.commands.register('/protect', self.cmd_protect_unified, "보안 관리", tags=['chat', 'agents'])
         self.commands.register('/inline', self.cmd_inline, "인라인 실행", tags=['chat', 'agents'])
@@ -580,7 +592,11 @@ class UnifiedSecureCLI:
     async def cmd_agents(self, ctx, *args):
         if args: self.active_persona = args[0].lower(); self.re_initialize(); ctx['should_reinit'] = True
     async def cmd_autonomy(self, ctx, *args):
-        if args: self.autonomy_level = args[0].lower(); self.ui.print_info(f"Autonomy: {self.autonomy_level.upper()}")
+        if args: 
+            self.autonomy_level = args[0].lower()
+            if hasattr(self, 'terminal_adapter'):
+                self.terminal_adapter.autonomy_level = self.autonomy_level
+            self.ui.print_info(f"Autonomy: {self.autonomy_level.upper()}")
     async def cmd_versions(self, ctx, *args): self.ui.display_versions(self._versions)
     async def cmd_clear(self, ctx, *args): self.ui.console.clear()
     async def cmd_efficient(self, ctx, *args): self.efficient_mode = not self.efficient_mode; self.ui.print_info(f"Efficient: {self.efficient_mode}")
@@ -608,7 +624,9 @@ class UnifiedSecureCLI:
     async def cmd_schedule(self, ctx, *args):
         if len(args) >= 3: self.ui.print_info(self.scheduler.schedule_once(args[0], int(args[1]), " ".join(args[2:])))
     async def cmd_compress(self, ctx, *args):
-        self.backend.history = await ContextCompressor(self.backend).compress(self.backend.history); self.ui.print_info("Compressed.")
+        # [Context Compression V2] Pass config for model selection
+        self.backend.history = await ContextCompressor(self.backend, self.config).compress(self.backend.history)
+        self.ui.print_info("Context compression completed.")
     async def cmd_skills(self, ctx, *args):
         sub = args[0] if args else "list"
         if sub == "list": self.ui.print_info(f"Skills: {self.skill_manager.list_skills()}")
@@ -641,12 +659,22 @@ class UnifiedSecureCLI:
     async def switch_mode(self, new_mode: str):
         if self.backend: await self.backend.close()
         self.cli_mode = new_mode
-        if self.cli_mode == "agents": self.backend = AgentBackend(self.config, self.prompt, ask_user_handler=self.run_shell)
-        else: self.backend = ChatBackend(self.config, self.prompt)
+        self.backend = BackendFactory.create_backend(
+            mode=self.cli_mode,
+            config=self.config,
+            prompt=self.prompt,
+            ask_user_handler=self.run_shell
+        )
         await self.backend.initialize(); self.ui.print_info(f"Switched to {self.cli_mode.upper()} backend.")
 
     def re_initialize(self):
         self.config = self.resolver.resolve_settings(); self.personas = self.resolver.discover_personas()
+        
+        # [Logging V2] Sync logging level on refresh
+        log_cfg = self.config.get('logging', {})
+        if hasattr(self, 'payload_logger'):
+            self.payload_logger.logger.setLevel(getattr(logging, log_cfg.get('level', 'INFO').upper(), logging.INFO))
+
         self.active_persona = list(self.personas.keys())[0] if self.active_persona not in self.personas else self.active_persona
         self.prompt = self.personas.get(self.active_persona)
         self._cached_cwd = os.getcwd().replace(os.path.expanduser('~'), '~')
@@ -684,10 +712,10 @@ class UnifiedSecureCLI:
         if self.autonomy_level != 'always':
             with patch_stdout(): confirm = await self.session.prompt_async(HTML(f"<b>Run?</b> <style fg='red'>{cmd}</style> (y/N): "))
             if confirm.lower() != 'y': return "Cancelled."
-        try:
-            res = await self.sandbox.execute_sandboxed(cmd); self.last_shell_output = f"STDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}"
-            return self.last_shell_output
-        except Exception as e: return f"Error: {e}"
+        
+        # [Adapter Pattern] Execute via terminal_adapter
+        self.last_shell_output = await self.terminal_adapter.execute(cmd)
+        return self.last_shell_output
 
     async def launch_rewind_ui(self):
         if not self.backend or not self.backend.history: return
@@ -696,17 +724,60 @@ class UnifiedSecureCLI:
         with patch_stdout(): idx = await self.session.prompt_async("Index: ")
         if idx.isdigit(): self.backend.history = self.backend.history[:int(idx)+1]
 
+    async def cmd_rag(self, ctx, *args):
+        sub = args[0] if args else "status"
+        if sub == "scan":
+            self.ui.print_info("Scanning workspace for RAG...")
+            await self.rag_engine.scan_and_index()
+            self.ui.print_info("Scan completed.")
+        elif sub == "status":
+            s = self.rag_engine.index_data
+            self.ui.print_info(f"RAG Status: {len(s['files'])} files indexed. Last scan: {s['last_scan']}")
+        elif sub == "clear":
+            self.rag_engine.index_data["files"] = {}
+            self.rag_engine.save_index()
+            self.ui.print_info("RAG Index cleared.")
+
     async def chat_cycle(self, user_input):
+        import uuid
+        trace_id = str(uuid.uuid4())[:8]
+        self.payload_logger.set_trace_id(trace_id)
+
+        # [V2] Auto-Compression Check
+        agent_cfg = self.config.get('agent', {})
+        threshold = agent_cfg.get('compression_threshold', 0)
+        if threshold > 0 and len(self.backend.history) > threshold:
+            self.payload_logger.info(f"Auto-compression triggered (History size: {len(self.backend.history)} > {threshold})")
+            await self.cmd_compress(None)
+
+        self.payload_logger.info(f"Chat cycle started: {user_input[:30]}...")
+
+        # [V3] Local RAG Context Search
+        rag_context = ""
+        if self.config.get('rag', {}).get('enabled', True):
+            rag_context = await self.rag_engine.search(user_input)
+            if rag_context:
+                self.payload_logger.info("Local RAG context injected.")
+
         file_refs = re.findall(r'@(?:\"([^\"]+)\"|([^\s\n]+))', user_input)
         injected = ""
         for q, u in file_refs:
             p = q if q else u; c = await self.read_file(p)
-            if not c.startswith("Error") and not c.startswith("Blocked"): injected += f"\n\n--- File: {p} ---\n{c}\n"
-        full_input = user_input + injected; masked_input = self.protector.mask(full_input); self.payload_logger.log_payload(self.cli_mode, masked_input)
+            if not c.startswith("Error") and not c.startswith("Blocked"): 
+                injected += f"\n\n--- File: {p} ---\n{c}\n"
+                self.payload_logger.debug(f"Injected file reference: {p}")
+        
+        full_input = user_input + injected + rag_context; 
+        masked_input = self.protector.mask(full_input); 
+        self.payload_logger.log_payload(self.cli_mode, masked_input)
+        
         try:
             self.ui.console.print(f"\n[{self.cli_mode}]🤖:"); 
             with self.ui.create_live_display() as live:
-                response, usage = await self.backend.chat(masked_input); self.telemetry.update_usage(usage)
+                response, usage = await self.backend.chat(masked_input)
+                self.telemetry.update_usage(usage)
+                self.payload_logger.info("AI response received", tokens=usage.get('total_tokens', 0))
+                
                 content = ""
                 if hasattr(response, 'text'):
                     res_attr = response.text

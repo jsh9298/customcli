@@ -16,6 +16,23 @@ agent:
   temperature: 0.7
   max_output_tokens: 8192
 
+  # [Context Compression V2]
+  # - compression_model: 압축(요약) 전용 모델. 비워두면 현재 model을 그대로 사용합니다.
+  # - compression_threshold: 자동 압축이 시작되는 히스토리 턴(Turn) 수. (0이면 수동 실행만 가능)
+  compression_model: "" 
+  compression_threshold: 10
+
+# [RAG Configuration]
+rag:
+  enabled: true
+  index_path: ".antigravity/rag_index.json"
+
+# [Logging & Audit]
+logging:
+  level: "INFO" # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  dir: "logs"
+  retain_days: 30
+
 # [State & Lifecycle Management]
 state:
   expiry_days: 7

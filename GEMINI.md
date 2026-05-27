@@ -1,6 +1,6 @@
 # 🛡️ Humble Custom AI Workstation: 에이전트 행동 강령 (GEMINI.md)
 
-본 문서는 **Humble Custom AI Workstation (v1.7.0)**의 핵심 설계 철학과 유지보수 원칙을 정의한 **최상위 지침서**입니다. 본 저장소를 넘겨받는 모든 에이전트(Antigravity/Gemini)는 아래 규칙을 절대적으로 준수해야 합니다.
+본 문서는 **Humble Custom AI Workstation (v2.0.0)**의 핵심 설계 철학과 유지보수 원칙을 정의한 **최상위 지침서**입니다. 본 저장소를 넘겨받는 모든 에이전트(Antigravity/Gemini)는 아래 규칙을 절대적으로 준수해야 합니다.
 
 ---
 
@@ -15,38 +15,38 @@
 
 ### A. Pure Local DLP (데이터 보호의 성역)
 모든 데이터는 **로컬을 떠나기 전**에 물리적으로 가명화되어야 합니다.
-*   **SHA-256 토큰화**: `protector.py`의 결정론적 해시 마스킹 로직을 훼손하지 마십시오.
-*   **전수 스캔**: 사용자 입력, @ 참조 파일, 도구 출력(Observation), 심지어 AI의 응답(Response Firewall)까지 반드시 보안 레이어를 통과해야 합니다.
+*   **Design Patterns 기반 보안**: CoR(책임 연쇄), Strategy(전략), Observer(옵저버) 패턴을 통해 보안 레이어를 모듈화하고 우회 불가능한 검증 체계를 유지하십시오.
+*   **Privacy-First RAG**: 클라우드 임베딩 전 반드시 로컬에서 **선제적 마스킹(Pre-masking)**을 수행하여 데이터 주권을 확보하십시오.
+*   **전수 스캔**: 사용자 입력, RAG 컨텍스트, 도구 출력(Observation), AI 응답(Response Firewall)까지 반드시 보안 레이어를 통과해야 합니다.
 
 ### B. Efficient by Design (경제적 추론)
 무료 티어 및 리소스 제한 환경에서도 최상의 성능을 내야 합니다.
-*   **슬라이딩 윈도우**: `max_history` 설정을 준수하여 불필요한 토큰 소모를 방지하십시오.
-*   **지능형 압축**: `/compress` 로직을 정교화하여 문맥 손실 없는 요약을 유지하십시오.
+*   **V2 자동 압축**: `ContextCompressor`의 자동 트리거 기능을 통해 토큰 소모를 최적화하고 문맥 손실을 최소화하십시오.
+*   **Trace ID 기반 감사**: 비동기 로깅 시스템을 활용하여 요청 단위의 비용 및 성능을 정밀 모니터링하십시오.
 
 ### C. Technical Integrity & Strict Engineering
-*   **TDD Mandatory**: 모든 기능 추가 및 수정 시 반드시 테스트 케이스를 먼저 작성하거나, 변경 직후 완벽한 유닛 테스트를 수행하십시오.
-*   **Docker-First Validation**: 로컬 환경의 오염을 방지하기 위해, 모든 코드는 실제 배포용 Docker 환경 내에서 런타임 검증(임포트 체크 및 실행 테스트)을 마친 후 본 코드에 통합하십시오.
-*   **Documentation-First**: 코드나 기능의 변경이 발생할 경우, **반드시 `README.md`를 즉시 업데이트**하여 최신 상태를 유지하십시오. 이는 인간 관리자의 개입 없이 에이전트가 자율적으로 수행해야 하는 의무입니다.
-*   **No Manual Bypass**: 성능 향상을 이유로 보안 레이어를 우회하는 수정은 즉시 반려됩니다.
+*   **Pattern-Driven Architecture**: Factory, Adapter 패턴을 준수하여 백엔드 및 터미널 실행 환경의 확장성을 유지하십시오.
+*   **Docker-First Validation**: 영구 볼륨(`.antigravity`, `logs`) 마운트를 포함한 Docker 환경에서의 검증을 필수로 합니다.
+*   **Documentation-First**: `README.md`와 `MAINTENANCE.md`를 기능 변경 즉시 업데이트하십시오.
 
 ---
 
 ## 3. 에이전트 협업 프로토콜 (Agent Protocols)
 
-미래의 Antigravity 에이전트는 작업 시 다음 절차를 따릅니다.
-1.  **Context Loading**: `MAINTENANCE.md`를 읽고 현재의 기술 부채와 로드맵을 확인한다.
-2.  **TDD Execution**: 테스트 코드를 통해 구현할 기능의 명세를 먼저 확정한다.
-3.  **Docker Sandbox Test**: 수정된 코드를 Docker 컨테이너 내에 설치하여 런타임 오류(NameError, ImportError 등)가 없는지 최종 검증한다.
-4.  **Documentation Update**: 기능 구현 완료 후 `README.md`에 변경 사항을 반영한다.
-5.  **Supervisor Review**: `/group supervisor,developer` 기능을 활용하여 변경 안의 보안 영향을 사전에 검토한다.
+1.  **Factory Initialization**: 새로운 백엔드나 모델 도입 시 `BackendFactory`를 통해서만 인스턴스화한다.
+2.  **Terminal Abstraction**: 모든 셸 명령은 `TerminalInterface` 어댑터를 통해 실행하며, 직접적인 `subprocess` 호출을 금지한다.
+3.  **RAG Integrity**: 색인 생성 시 `SecurityProtector`와의 연동을 통해 원본 데이터가 인덱스에 노출되지 않도록 한다.
+4.  **Logging Audit**: 비동기 큐에 쌓인 로그를 통해 `Trace ID` 별 실행 경로를 상시 감시한다.
 
 ---
 
-## 4. 로드맵 및 향후 과제
+## 4. 주요 구현 아키텍처 (v2.0.0)
 
-*   **로컬 RAG 고도화**: 단순 파일 주입을 넘어선 벡터 기반 지식 베이스 구축.
-*   **멀티모달 보안**: 이미지 및 PDF 내 민감 정보의 로컬 OCR 마스킹.
-*   **OpenAI Bridge 확장**: 더 다양한 로컬/외부 모델과의 완벽한 호환성 확보.
+- [x] **Local RAG V3**: NumPy 기반의 초경량/고보안 로컬 벡터 검색 엔진.
+- [x] **Context Compression V2**: 모델 유연성과 자동 트리거를 갖춘 계층적 요약 시스템.
+- [x] **Enriched Logging**: Trace ID 및 전략 패턴이 적용된 비동기 감사 로깅.
+- [x] **Unified Backend Factory**: Chat/Agent 백엔드 통합 관리 및 스위칭 레이어.
+- [x] **Terminal Adapter**: 실행 환경(Local/Sandbox)의 추상화 및 보안 강화.
 
 ---
 **Maintainer Note**: 에이전트여, 이 코드는 너의 선조인 Gemini CLI가 남긴 유산이다. 자부심을 가지고 지켜나가길 바란다.

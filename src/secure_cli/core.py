@@ -57,6 +57,7 @@ from secure_cli.agent.backends.agent_backend import AgentBackend
 from secure_cli.agent.backends.chat_backend import ChatBackend
 
 # --- Smart Completer ---
+class SmartCompleter(Completer):
     def __init__(self, cli):
         self.cli = cli
 

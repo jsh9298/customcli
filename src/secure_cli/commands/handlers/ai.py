@@ -51,8 +51,7 @@ class AIHandlers(BaseHandler):
             return
 
         # Interactive UI
-        self.cli.ui.display_interactive_menu("Select Agent Persona", personas)
-        idx = await self.ask_selection("Persona Index: ")
+        idx = await self.ask_selection("Select Agent Persona", personas)
         if idx and idx.isdigit() and int(idx) < len(personas):
             self.cli.active_persona = personas[int(idx)]
             self.cli.re_initialize()
@@ -64,14 +63,12 @@ class AIHandlers(BaseHandler):
         available_skills = self.cli.skill_manager.list_skills()
         options = ["List Activated Skills", "Load New Skill", "Save Current Prompt as Skill"]
         
-        self.cli.ui.display_interactive_menu("Agent Skills Manager", options)
-        idx = await self.ask_selection("Option Index: ")
+        idx = await self.ask_selection("Agent Skills Manager", options)
         
         if idx == '0':
             self.cli.ui.print_info(f"Available: {available_skills}")
         elif idx == '1':
-            self.cli.ui.display_interactive_menu("Select Skill to Load", available_skills)
-            s_idx = await self.ask_selection("Skill Index: ")
+            s_idx = await self.ask_selection("Select Skill to Load", available_skills)
             if s_idx.isdigit() and int(s_idx) < len(available_skills):
                 skill_name = available_skills[int(s_idx)]
                 sk = self.cli.skill_manager.load_skill(skill_name)
@@ -80,7 +77,7 @@ class AIHandlers(BaseHandler):
                     ctx['should_reinit'] = True
                     self.cli.ui.print_success(f"Skill '{skill_name}' activated.")
         elif idx == '2':
-            name = await self.ask_selection("Skill Name to Save: ")
+            name = await self.cli.session.prompt_async("Skill Name to Save: ")
             if name:
                 self.cli.skill_manager.save_skill(name, {"instruction": self.cli.prompt})
                 self.cli.ui.print_success(f"Saved skill: {name}")

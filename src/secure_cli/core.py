@@ -34,11 +34,13 @@ from secure_cli.commands.handlers.tools import ToolHandlers
 from secure_cli.commands.handlers import CommandHandlers # Transitional
 
 from secure_cli.agent.backends.factory import BackendFactory
+from secure_cli.agent.orchestrator import AgentOrchestrator
 from secure_cli.utils.mcp import MCPManager
 from secure_cli.utils.git import GitUtility
 from secure_cli.utils.terminal_adapter import LocalTerminalAdapter
 from secure_cli.utils.rag import LocalRAGEngine
 from secure_cli.utils.logger import PayloadLogger
+from secure_cli.utils.skills import SkillManager
 
 class ConfigResolver:
     GLOBAL_ROOT = os.path.expanduser('~/.gemini/antigravity-cli')
@@ -75,6 +77,9 @@ class UnifiedSecureCLI:
         self.rag_engine = LocalRAGEngine(self)
         self.mcp_manager = MCPManager(self.protector)
         self.git = GitUtility()
+        self.orchestrator = AgentOrchestrator(self)
+        self.skill_dir = os.path.join(self.resolver.PROJECT_ROOT, 'skills')
+        self.skill_manager = SkillManager(self.skill_dir)
         
         self.commands = CommandRegistry()
         self.ai_h = AIHandlers(self)
@@ -150,6 +155,17 @@ class UnifiedSecureCLI:
         self.prompt = self.personas.get(self.active_persona, "Helpful assistant.")
         self._cached_cwd = os.getcwd().replace(os.path.expanduser('~'), '~')
 
+    def is_path_ignored(self, path: str) -> bool:
+        exclude_patterns = self.config.get('exclude_paths', [])
+        normalized_path = os.path.normpath(path)
+        parts = normalized_path.split(os.sep)
+        for pattern in exclude_patterns:
+            if any(fnmatch.fnmatch(part, pattern) for part in parts):
+                return True
+            if fnmatch.fnmatch(normalized_path, pattern) or fnmatch.fnmatch(os.path.basename(path), pattern):
+                return True
+        return False
+
     async def chat_cycle(self, user_input: str):
         import uuid
         self.payload_logger.set_trace_id(str(uuid.uuid4())[:8])
@@ -167,6 +183,15 @@ class UnifiedSecureCLI:
             self.backend.history.append({"role": "user", "content": user_input})
             self.backend.history.append({"role": "assistant", "content": self.last_response})
             self.telemetry.update_usage({"total_tokens": len(full_response)//4})
+
+            # Auto-trigger Context Compression
+            from secure_cli.utils.compressor import ContextCompressor
+            compressor = ContextCompressor(self.backend, self.config)
+            threshold = compressor.auto_threshold
+            if threshold > 0 and len(self.backend.history) >= threshold:
+                self.ui.print_info("⚡ Context threshold reached. Compressing conversation history...")
+                self.backend.history = await compressor.compress(self.backend.history)
+                self.ui.print_success("Context compressed successfully.")
         except Exception as e: self.ui.print_error(f"Error: {e}")
 
     async def run(self):
@@ -186,5 +211,11 @@ class UnifiedSecureCLI:
                     else: await self.chat_cycle(user_input)
                 except (KeyboardInterrupt, EOFError): return
 
+def main():
+    try:
+        asyncio.run(UnifiedSecureCLI().run())
+    except KeyboardInterrupt:
+        pass
+
 if __name__ == "__main__":
-    asyncio.run(UnifiedSecureCLI().run())
+    main()

@@ -104,8 +104,7 @@ class SystemHandlers(BaseHandler):
         
         self.cli.ui.console.print(Panel(table, border_style="cyan"))
         options = ["Refresh List", "Kill All Processes", "Back"]
-        self.cli.ui.display_interactive_menu("Shell Controls", options)
-        await self.ask_selection("Option Index: ")
+        await self.ask_selection("Shell Controls", options)
 
     async def permissions(self, ctx, *args):
         """Hybrid: Fast toggle or interactive permission editor."""
@@ -120,8 +119,7 @@ class SystemHandlers(BaseHandler):
             "[always] Trust all AI tool executions (YOLO)",
             "[strict] Only allow read-only operations"
         ]
-        self.cli.ui.display_interactive_menu("Permission Governance", options)
-        idx = await self.ask_selection("Level Index: ")
+        idx = await self.ask_selection("Permission Governance", options)
         if idx and idx.isdigit() and int(idx) < len(levels):
             self.cli.autonomy_level = levels[int(idx)]
             self.cli.ui.print_success(f"Level set to {self.cli.autonomy_level.upper()}")
